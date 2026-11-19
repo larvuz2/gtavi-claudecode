@@ -371,7 +371,8 @@ def main():
         from clean import heard_bad, is_bad, merge, mute_filter
         hits = heard_bad(c["source"], s0, e0)
         cap_hits = [(w["s"] - c_s, w["e"] - c_s, w["w"]) for w in cap_words if c_s <= w["s"] < c_e and is_bad(w["w"])]
-        muted = merge([(x - 0.08, max(y, x + 0.4)) for x, y, _ in hits] + [(x - 0.25, y + 0.25) for x, y, _ in cap_hits])
+        # start early: the first sound of a word is enough to hear it
+        muted = merge([(x - 0.25, max(y, x + 0.45)) for x, y, _ in hits] + [(x - 0.25, y + 0.25) for x, y, _ in cap_hits])
         muted = [(max(0.0, float(x)), min(float(e0 - s0), float(y))) for x, y in muted]
         print(f"clean: heard {[h[2] for h in hits]}, captions {[h[2] for h in cap_hits]}, muted {muted}")
     af = ",".join(x for x in (mute_filter(muted) if muted else "", "loudnorm=I=-14:TP=-1.5:LRA=11") if x)
