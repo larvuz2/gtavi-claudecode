@@ -5,6 +5,7 @@ loudness normalised to -14 LUFS. Writes jobs/<id>/edits/clip_<n>.mp4 + .json (me
 
 usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|focus|facecam|react] [--hook "TEXT"]
                      [--segments "12.3-20,23.8-27.3"] (jump cuts, source seconds) [--focus "0:0.62,8:0.45"] [--hook-secs 0]
+                     [--lines lines.json] (captions from the game's own subtitles) [--trim-bottom 0.1] (hide burned-in overlays)
                      [--cam auto|x:y:w:h] [--title "TEXT" --title-style box|outline --title-secs 0] [--captions word|bubble|none]
 """
 import argparse, sys
@@ -150,6 +151,25 @@ def parse_segments(spec):
     return [tuple(float(x) for x in p.split("-")) for p in spec.split(",") if p.strip()]
 
 
+def lines_to_words(lines):
+    """[[start, end, "text"], ...] in source seconds -> word timings spread evenly over each line."""
+    out = []
+    for a, b, text in lines:
+        ws = text.split(); step = (b - a) / max(len(ws), 1)
+        out += [{"w": w, "s": round(a + i * step, 2), "e": round(a + (i + 1) * step, 2)} for i, w in enumerate(ws)]
+    return out
+
+
+def concat_segments(src, segs, dst):
+    """Join the kept parts of the source into one file (near-lossless), so every layout works on jump cuts."""
+    parts = "".join(f"[0:v]trim={x:.3f}:{y:.3f},setpts=PTS-STARTPTS[v{i}];[0:a]atrim={x:.3f}:{y:.3f},asetpts=PTS-STARTPTS,"
+                    f"afade=t=in:d=0.03,afade=t=out:st={max(0, y - x - 0.03):.3f}:d=0.03[a{i}];" for i, (x, y) in enumerate(segs))
+    graph = parts + "".join(f"[v{i}][a{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=1:a=1[v][a]"
+    run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(src), "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+         "-c:v", "libx264", "-preset", "fast", "-crf", "12", "-c:a", "aac", "-b:a", "256k", str(dst)])
+    return dst
+
+
 def remap_words(words, segs):
     """Words on the output timeline after jump cuts."""
     out, off = [], 0.0
@@ -165,7 +185,7 @@ def even(n):
     return int(n) // 2 * 2
 
 
-def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, inp='[0:v]', focus=None):
+def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, inp='[0:v]', focus=None, trim_bottom=0.0):
     """Layout + burned-caption filter graph ending in [vo]. Reused by translate.py."""
     if layout == "fill":
         v = f"[0:v]scale=-2:{H},crop={W}:{H}[v]"
@@ -198,6 +218,9 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{int(H * 0.38)}:force_original_aspect_ratio=increase,"
              f"crop={W}:{int(H * 0.38)}[cam];[b]scale=-2:{H - int(H * 0.38)},crop={W}:{H - int(H * 0.38)}[game];[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
+    if trim_bottom > 0:  # cut off the bottom of the source (a streamer's own burned-in captions, alerts)
+        v = f"{inp}crop=iw:floor(ih*{1 - trim_bottom:.3f}/2)*2:0:0[trim];" + v.replace("[0:v]", "[trim]", 1)
+        return v + f";[v]fps=30,subtitles='{sub}'[vo]"
     return v.replace("[0:v]", inp) + f";[v]fps=30,subtitles='{sub}'[vo]"
 
 
@@ -258,15 +281,23 @@ def main():
     ap.add_argument("--focus", default="0:0.5", help='focus layout: "t:cx,..." keyframes, output seconds : centre x fraction')
     ap.add_argument("--hook-secs", type=float, default=None, help="seconds the hook stays; 0 = whole clip (default for focus)")
     ap.add_argument("--name", default="", help="output file stem, default clip_<pick>")
+    ap.add_argument("--lines", default="", help='json [[start, end, "text"], ...] in source seconds: captions from the game subtitles')
+    ap.add_argument("--trim-bottom", type=float, default=0.0, help="fill/blur/focus: drop this fraction of the source's bottom")
     a = ap.parse_args()
     d = Path(a.job); c = load_json(d / "candidates.json")
     pick = next(x for x in c["candidates"] if x["n"] == a.pick)
     s0 = a.start if a.start is not None else pick["start"]; e0 = a.end if a.end is not None else pick["end"]
     words = load_json(d / "transcript.json")
+    if a.lines:
+        words = lines_to_words(load_json(a.lines))
     segs = parse_segments(a.segments)
-    if segs:
-        s0, e0 = segs[0][0], segs[-1][1]
     out = d / "edits"; out.mkdir(exist_ok=True)
+    stem = a.name or f"clip_{a.pick}"
+    orig_source = c["source"]
+    if segs:  # join the kept parts first; everything after works on the joined file from 0 to its end
+        c["source"] = str(concat_segments(orig_source, segs, out / f"{stem}.src.mp4"))
+        words, total = remap_words(words, segs)
+        s0, e0 = 0.0, total
     layout, cam, side = a.layout, a.cam, 'right'
     face_expr = None
     if layout in ('react', 'facecam') and cam == 'auto':
@@ -314,16 +345,11 @@ def main():
             title = ('box', a.title, TOP, a.title_secs)
         else:
             title = ('outline', a.title, TOP + 40, a.title_secs)
-    stem = a.name or f"clip_{a.pick}"
     ass = out / f"{stem}.ass"
     hook_secs = a.hook_secs if a.hook_secs is not None else (0 if layout == "focus" else 2.6)
     caps = a.captions
     cap_words = words if caps != 'none' else []
-    if segs:
-        cap_words, total = remap_words(cap_words, segs)
-        c_s, c_e = 0.0, total
-    else:
-        c_s, c_e = s0, e0
+    c_s, c_e = s0, e0
     ass.write_text(build_ass(cap_words, c_s, c_e, a.hook, cap_y, title=title, caps=caps, profanity=a.allow_profanity,
                              hook_secs=hook_secs, hook_y=120 if layout == "focus" else 170, hook_fs=80 if layout == "focus" else 68), encoding="utf-8")
     src = None; gx = None
@@ -333,24 +359,18 @@ def main():
         src = (int(vs['width']), int(vs['height']))
         gx = game_offset(c['source'], s0, e0, src, [float(t) for t in cam.split(':')])
     mp4 = out / f"{stem}.mp4"
-    if segs:  # jump cuts: trim each segment, join, then lay out
-        if layout in ("react", "facecam"):
-            sys.exit("--segments works with fill, blur and focus")
-        parts = "".join(f"[0:v]trim={x:.2f}:{y:.2f},setpts=PTS-STARTPTS[v{i}];[0:a]atrim={x:.2f}:{y:.2f},asetpts=PTS-STARTPTS,"
-                        f"afade=t=in:d=0.03,afade=t=out:st={y - x - 0.03:.2f}:d=0.03[a{i}];" for i, (x, y) in enumerate(segs))
-        joined = "".join(f"[v{i}][a{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=1:a=1[vc][ac];"
-        v = parts + joined + video_filter(layout, cam, ass, inp="[vc]", focus=a.focus) + ";[ac]loudnorm=I=-14:TP=-1.5:LRA=11[ao]"
-        io = ["-i", c["source"], "-filter_complex", v, "-map", "[vo]", "-map", "[ao]"]
-    else:
-        v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr, focus=a.focus)
-        io = ["-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
-              "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"]
+    if a.trim_bottom and layout in ("react", "facecam"):
+        sys.exit("--trim-bottom works with fill, blur and focus")
+    v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr, focus=a.focus,
+                     trim_bottom=a.trim_bottom)
+    io = ["-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
+          "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"]
     run([tool("ffmpeg"), "-y", "-v", "error", *io,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
     info = c.get("info", {})
     save_json(out / f"{stem}.json", {"file": str(mp4), "start": s0, "end": e0, "segments": segs, "source_views": info.get("view_count"), "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
-                                            "source_url": info.get("webpage_url"), "source_title": info.get("title"),
+                                            "source_file": orig_source, "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)
 

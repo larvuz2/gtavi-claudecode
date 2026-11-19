@@ -19,7 +19,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-MODEL_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
+MODEL_URLS = [  # same file; mirrors for networks that block github.com raw downloads
+    "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+    "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+    "https://huggingface.co/opencv/face_detection_yunet/resolve/main/face_detection_yunet_2023mar.onnx",
+]
 MODEL = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".cache")) / "gtavi-claudecode" / "models" / "face_detection_yunet_2023mar.onnx"
 N_FRAMES = 12
 MAX_W = 1280  # analysis width
@@ -29,7 +33,16 @@ def model_path():
     if not MODEL.exists() or MODEL.stat().st_size < 100_000:
         MODEL.parent.mkdir(parents=True, exist_ok=True)
         tmp = MODEL.with_suffix(".part")
-        urllib.request.urlretrieve(MODEL_URL, tmp)
+        err = None
+        for url in MODEL_URLS:
+            try:
+                urllib.request.urlretrieve(url, tmp)
+                if tmp.stat().st_size > 100_000:
+                    break
+            except OSError as e:
+                err = e
+        else:
+            sys.exit(f"could not download the face model ({err}). Put it at {MODEL} by hand.")
         tmp.replace(MODEL)
     return str(MODEL)
 

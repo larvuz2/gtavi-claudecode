@@ -106,7 +106,7 @@ def z(a):
 
 
 def smooth(a, k):
-    k = max(1, int(k))
+    k = max(1, min(int(k), len(a)))  # a kernel longer than the signal would change the output length
     return np.convolve(a, np.ones(k) / k, mode="same")
 
 
