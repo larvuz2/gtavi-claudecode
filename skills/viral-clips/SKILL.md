@@ -55,4 +55,16 @@ Target 15 to 30 seconds. Then look at frame 1 and a frame sheet of the result. T
 
 ## 5. Check and hand over
 
-Run `rule-check`. Write the caption: one line that says what happens, 3 to 5 hashtags, and the credit line. `post.py` adds the credit from the clip's metadata: `🎥 LIRIK on Twitch (twitch.tv/lirik)`. Log the source URL in `log.md`.
+Run `rule-check`. Write the caption in this order:
+
+```
+Nobody told us GTA 6 had THIS 🐕        <- hook: curiosity or tension, under 8 words, does not repeat the on-video title
+
+Would you let him drive? 👇             <- a question anyone can answer in one word: drives comments
+
+#gta6 #gtavi #gaming #fyp + 1 topic tag
+
+🎥 LIRIK on Twitch (twitch.tv/lirik)    <- streamer credit, always last
+```
+
+The streamer's name goes only in the credit line at the end. The hook must be true to the clip. `post.py` adds the credit line if it is missing. Log the source URL in `log.md`.
