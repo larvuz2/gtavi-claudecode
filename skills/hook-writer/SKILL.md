@@ -39,8 +39,9 @@ Describe what happens on screen. Never put words in the streamer's mouth: no quo
 1. The clip must deliver the hook. If the hook says 3 things, show 3. No clickbait.
 2. No spoilers for story moments in launch week. Label such clips SPOILER in the caption, not in the hook.
 3. Never imply the page is Rockstar. Never write "official" for fan content.
-4. Use "GTA 6". One emoji at most.
-5. Do not reuse the same hook within a week. Check `log.md`.
-6. Facts in the hook must be true and verified. Numbers must match the clip.
+4. No swear words in hooks or titles, not even starred.
+5. Use "GTA 6". One emoji at most.
+6. Do not reuse the same hook within a week. Check `log.md`.
+7. Facts in the hook must be true and verified. Numbers must match the clip.
 
 Return the 3 options and mark your pick.

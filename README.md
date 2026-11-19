@@ -76,6 +76,8 @@ Nothing is uploaded unless you run `post.py --go` yourself or tell Claude to.
 
 ## Hard rules
 
+Clean language: no swear word is heard or shown in any clip. The cutter mutes swears in the audio and leaves them out of the captions; the rule check listens to the finished clip and fails it if one gets through.
+
 No leaks, no "play early" or "free download" posts, no piracy, no GTA Online money or AFK bots, no fake news, never pretends to be Rockstar. Every fact needs an official source.
 
 ## Run the scripts yourself

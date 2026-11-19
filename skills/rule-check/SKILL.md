@@ -9,7 +9,7 @@ Run:
 
 `python "${CLAUDE_PLUGIN_ROOT}/scripts/check.py" <clip.mp4> --campaign campaigns.md`
 
-It checks: length, 1080x1920, audio present, the campaign's rules from `campaigns.md`, and banned content (leaks, "play early", piracy).
+It checks: no swearing heard in the audio (two speech models listen to the finished clip) or shown in the captions, hook and post caption, then length, 1080x1920, audio present, the campaign's rules from `campaigns.md`, and banned content (leaks, "play early", piracy).
 
 Then:
 

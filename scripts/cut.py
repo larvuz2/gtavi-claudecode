@@ -87,7 +87,10 @@ Style: Bubble,Arial,58,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     ev = []
-    ws = [dict(w, w=clean(w["w"], profanity)) for w in words if s0 <= w["s"] < e0 and w["w"]]
+    ws = [dict(w, w=clean(w["w"], True)) for w in words if s0 <= w["s"] < e0 and w["w"]]  # slurs masked always
+    if not profanity:  # clean-language rule: swears are left out of the captions
+        from clean import drop_bad
+        ws = drop_bad(ws)
     # groups of up to 3 words, break on punctuation or pauses
     groups, cur = [], []
     for w in ws:
@@ -274,7 +277,7 @@ def main():
     ap.add_argument("--title-secs", type=float, default=0, help="0 = whole clip")
     ap.add_argument("--captions", choices=["word", "bubble", "none"], default="word")
     ap.add_argument("--hook", default="")
-    ap.add_argument("--allow-profanity", action="store_true", help="keep swear words in captions (slurs are always masked)")
+    ap.add_argument("--allow-profanity", action="store_true", help="keep swear words in audio and captions (off by default)")
     ap.add_argument("--cam", default="auto", help="auto (find the webcam) or x:y:w:h fractions")
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
     ap.add_argument("--segments", default="", help='jump cuts in source seconds, e.g. "12.3-20,23.8-27.3,29.5-41.8"')
@@ -363,13 +366,22 @@ def main():
         sys.exit("--trim-bottom works with fill, blur and focus")
     v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr, focus=a.focus,
                      trim_bottom=a.trim_bottom)
+    muted = []
+    if not a.allow_profanity:  # clean-language rule: silence every swear heard, plus any the captions know about
+        from clean import heard_bad, is_bad, merge, mute_filter
+        hits = heard_bad(c["source"], s0, e0)
+        cap_hits = [(w["s"] - c_s, w["e"] - c_s, w["w"]) for w in cap_words if c_s <= w["s"] < c_e and is_bad(w["w"])]
+        muted = merge([(x - 0.08, max(y, x + 0.4)) for x, y, _ in hits] + [(x - 0.25, y + 0.25) for x, y, _ in cap_hits])
+        muted = [(max(0.0, float(x)), min(float(e0 - s0), float(y))) for x, y in muted]
+        print(f"clean: heard {[h[2] for h in hits]}, captions {[h[2] for h in cap_hits]}, muted {muted}")
+    af = ",".join(x for x in (mute_filter(muted) if muted else "", "loudnorm=I=-14:TP=-1.5:LRA=11") if x)
     io = ["-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
-          "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"]
+          "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", af]
     run([tool("ffmpeg"), "-y", "-v", "error", *io,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
     info = c.get("info", {})
-    save_json(out / f"{stem}.json", {"file": str(mp4), "start": s0, "end": e0, "segments": segs, "source_views": info.get("view_count"), "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
+    save_json(out / f"{stem}.json", {"file": str(mp4), "start": s0, "end": e0, "segments": segs, "muted": muted, "clean": not a.allow_profanity, "source_views": info.get("view_count"), "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_file": orig_source, "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)

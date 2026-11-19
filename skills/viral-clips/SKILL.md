@@ -49,6 +49,10 @@ Streamer with a webcam and a reaction worth showing: `--layout react --cam auto 
 
 Target 15 to 30 seconds. Then look at frame 1 and a frame sheet of the result. The subject of the hook must be visible in frame 1 and never cropped out.
 
+## Clean language
+
+**Clean language, every clip.** No swear word may be heard or read. `cut.py` mutes every swear in the audio (streamer and game characters) and leaves swears out of the captions; `check.py` re-transcribes the finished clip with two speech models and fails it if any swear is still heard or shown. Write the real game subtitle text, swears included, in `--lines` files, so their timing helps the mute. Never pass `--allow-profanity` for a page post.
+
 ## 5. Check and hand over
 
 Run `rule-check`. Write the caption: one line that says what happens, 3 to 5 hashtags, and the credit line. `post.py` adds the credit from the clip's metadata: `🎥 LIRIK on Twitch (twitch.tv/lirik)`. Log the source URL in `log.md`.

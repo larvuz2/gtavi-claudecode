@@ -25,7 +25,7 @@ Without `--go` it prints the caption and fields and posts nothing. It refuses to
 
 ## Rules
 
-- Only clips that passed `rule-check`. The first post of any new format goes to the human for a "yes".
+- Only clips that passed `rule-check`, including its clean-language checks. The first post of any new format goes to the human for a "yes".
 - At most 15 posts per TikTok account in 24 hours (TikTok's limit, shared by every tool). Space posts at least 2 hours apart.
 - A new TikTok account: post the first few videos by hand in the app before using the API, so the account does not look automated.
 - The API cannot use TikTok's trending sounds. The clip's own audio is the sound.

@@ -18,6 +18,8 @@ Before running:
 
 1. Get 3 hook options from the `hook-writer` skill and use the best one.
 
+Clean language is on by default: swears are muted in the audio and left out of the captions. It prints `clean: heard [...] muted [...]`.
+
 After running:
 
 1. Output is an mp4 in `media/edits`. Check it is 1080x1920, the hook shows in the first 2 seconds, captions are readable. No credit text is burned into the video; the poster credits the creator in the post.

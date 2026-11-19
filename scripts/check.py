@@ -44,6 +44,7 @@ def banned_in(text):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("clip"); ap.add_argument("--campaign"); ap.add_argument("--caption", default="")
+    ap.add_argument("--allow-profanity", action="store_true", help="skip the clean-language checks")
     a = ap.parse_args()
     clip = Path(a.clip)
     res = []  # (name, ok, detail)
@@ -72,6 +73,21 @@ def main():
     hook = meta.get("hook", "")
     hits = banned_in(hook + " " + a.caption)
     add("no banned terms in caption/hook", not hits, ", ".join(hits))
+    if not a.allow_profanity:  # clean-language rule: nothing a person or a moderation model could hear or read
+        from clean import heard_bad, is_bad
+        heard = heard_bad(clip) + heard_bad(clip, model="small")  # two models: one's miss is not a pass
+        add("no swearing in the audio", not heard, ", ".join(f"{w} at {s:.1f}s" for s, e, w in heard))
+        ass = clip.with_suffix(".ass")
+        shown = []
+        if ass.exists():
+            for ln in ass.read_text(encoding="utf-8").splitlines():
+                if ln.startswith("Dialogue:"):
+                    txt = re.sub(r"\{[^}]*\}", " ", ln.split(",", 9)[-1]).replace("\\N", " ")
+                    shown += [w for w in txt.split() if is_bad(w)]
+        add("no swearing in the captions" + ("" if ass.exists() else " (no .ass found, hook and caption only)"), not shown,
+            ", ".join(sorted(set(shown))))
+        text_bad = [w for w in (hook + " " + a.caption).split() if is_bad(w)]
+        add("no swearing in hook and post caption", not text_bad, ", ".join(text_bad))
     if rules["tags"]:
         miss = [t for t in rules["tags"] if t.lower() not in a.caption.lower()]
         add("required hashtags", not miss, ("missing " + " ".join(miss)) if miss else " ".join(rules["tags"]))
