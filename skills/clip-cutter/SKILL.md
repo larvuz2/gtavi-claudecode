@@ -7,10 +7,11 @@ description: Cut a picked moment into a finished 1080x1920 vertical clip with wo
 
 Run:
 
-`python "${CLAUDE_PLUGIN_ROOT}/scripts/cut.py" jobs/<id> --pick <n> --layout fill|blur|facecam --hook "TEXT"`
+`python "${CLAUDE_PLUGIN_ROOT}/scripts/cut.py" jobs/<id> --pick <n> --layout fill|blur|focus|facecam --hook "TEXT"`
 
 - `fill`: crop the game video to fill the frame. Default for gameplay.
 - `blur`: full video centered over a blurred copy. Use when cropping would cut off the action.
+- `focus`: a 4:5 window that follows the action, hook above it for the whole clip. Takes `--segments` (jump cuts) and `--focus` (where to look). See the `viral-clips` skill.
 - `facecam`: gameplay with the streamer's camera shown. Use for reactions.
 
 Before running:

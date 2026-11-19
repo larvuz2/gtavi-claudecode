@@ -5,6 +5,8 @@ description: Write on-screen hooks for GTA 6 clips. Use whenever a clip needs a 
 
 # Hook writer
 
+Read `references/hook-evidence.md` first: the rules for the first 3 seconds and the sources behind them.
+
 Write 3 options per clip. Sentence case. Short: 3 to 9 words fit the hook box.
 
 ## What works

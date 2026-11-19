@@ -3,7 +3,8 @@
 1080x1920, 30 fps, word-by-word burned captions (slurs and swears masked), hook box in the first seconds,
 loudness normalised to -14 LUFS. Writes jobs/<id>/edits/clip_<n>.mp4 + .json (metadata for check.py).
 
-usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|facecam|react] [--hook "TEXT"]
+usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|focus|facecam|react] [--hook "TEXT"]
+                     [--segments "12.3-20,23.8-27.3"] (jump cuts, source seconds) [--focus "0:0.62,8:0.45"] [--hook-secs 0]
                      [--cam auto|x:y:w:h] [--title "TEXT" --title-style box|outline --title-secs 0] [--captions word|bubble|none]
 """
 import argparse, sys
@@ -12,6 +13,21 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import load_json, run, save_json, tool
 
 W, H = 1080, 1920
+
+
+def _font():
+    """Arial Black where it exists (Windows, macOS), else the heaviest sans installed (Linux servers)."""
+    import shutil, subprocess
+    if not shutil.which("fc-list"):
+        return "Arial Black"
+    have = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True).stdout.lower()
+    for f in ("Arial Black", "Anton", "Montserrat Black", "Inter Black", "DejaVu Sans"):
+        if f.lower() in have:
+            return f
+    return "Arial Black"
+
+
+FONT = _font()
 
 
 def ts(t):
@@ -51,7 +67,7 @@ def wrap(text, width):
     return lines + ([cur] if cur else [])
 
 
-def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False):
+def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False, hook_secs=2.6, hook_y=170, hook_fs=68):
     hdr = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -79,7 +95,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         cur.append(w)
     if cur:
         groups.append(cur)
-    hook_end = 2.6 if hook else 0
+    hook_end = ((e0 - s0) if hook_secs <= 0 else hook_secs) if hook else 0
     for gi, g in enumerate(groups):
         g_end = groups[gi + 1][0]["s"] if gi + 1 < len(groups) else g[-1]["e"] + 0.4
         g_end = min(g_end, g[-1]["e"] + 0.8)
@@ -110,11 +126,37 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             ev.append(f"Dialogue: 2,{ts(0)},{ts(end)},TitleOut,,0,0,0,,{{\\pos({W // 2},{ty})\\an8}}{body}")
         hook = ''
     if hook:
-        ev.append(f"Dialogue: 1,{ts(0)},{ts(hook_end)},Hook,,0,0,0,,{{\\fad(0,180)\\fscx92\\fscy92\\t(0,120,\\fscx100\\fscy100)}}{esc(hook)}")
-    return hdr + "\n".join(ev) + "\n"
+        body_h = "\\N".join(wrap(esc(hook), 22 if hook_fs <= 70 else 19))
+        ev.append(f"Dialogue: 1,{ts(0)},{ts(hook_end)},Hook,,0,0,0,,{{\\an8\\fs{hook_fs}\\pos({W // 2},{hook_y})\\fad(0,180)\\fscx92\\fscy92\\t(0,120,\\fscx100\\fscy100)}}{body_h}")
+    return hdr.replace("Arial Black", FONT) + "\n".join(ev) + "\n"
 
 
-CAP_Y = {"fill": 1380, "blur": 1460, "facecam": 1120, "react": 1560}
+CAP_Y = {"fill": 1380, "blur": 1460, "facecam": 1120, "react": 1560, "focus": 1420}
+FOCUS_Y, FOCUS_H = 320, 1350  # focus layout: a 4:5 window on the action, title above it, both inside TikTok's safe area
+
+
+def focus_x(keys, cw):
+    """Piecewise-linear crop x from "t:cx,t:cx" keyframes (output seconds : centre as a fraction of the width)."""
+    pts = sorted((float(a), float(b)) for a, b in (k.split(":") for k in keys.split(",")))
+    px = lambda c: f"(iw*{c:.4f}-{cw}/2)"
+    e = px(pts[-1][1])
+    for (t0, c0), (t1, c1) in reversed(list(zip(pts, pts[1:]))):
+        e = f"if(lt(t,{t1}),{px(c0)}+({px(c1)}-{px(c0)})*(t-{t0})/{max(t1 - t0, 0.01)},{e})"
+    e = f"if(lt(t,{pts[0][0]}),{px(pts[0][1])},{e})"
+    return f"max(0,min(iw-{cw},{e}))".replace(",", "\\,")
+
+
+def parse_segments(spec):
+    return [tuple(float(x) for x in p.split("-")) for p in spec.split(",") if p.strip()]
+
+
+def remap_words(words, segs):
+    """Words on the output timeline after jump cuts."""
+    out, off = [], 0.0
+    for a, b in segs:
+        out += [dict(w, s=round(off + w["s"] - a, 2), e=round(off + min(w["e"], b) - a, 2)) for w in words if a <= w["s"] < b]
+        off += b - a
+    return out, off
 TOP = 730  # react layout: face panel height = seam y (even)
 GAME_H = H - TOP  # 1190
 
@@ -123,10 +165,14 @@ def even(n):
     return int(n) // 2 * 2
 
 
-def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None):
+def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, inp='[0:v]', focus=None):
     """Layout + burned-caption filter graph ending in [vo]. Reused by translate.py."""
     if layout == "fill":
         v = f"[0:v]scale=-2:{H},crop={W}:{H}[v]"
+    elif layout == "focus":
+        cw = "floor(ih*0.8/2)*2"
+        v = (f"[0:v]split[a][b];[a]scale=-2:{H},crop={W}:{H},boxblur=30:3,eq=brightness=-0.28[bg];"
+             f"[b]crop={cw}:ih:{focus_x(focus or '0:0.5', cw)}:0,scale={W}:{FOCUS_H},setsar=1[fg];[bg][fg]overlay=0:{FOCUS_Y}[v]")
     elif layout == "blur":
         v = (f"[0:v]split[a][b];[a]scale=-2:{H},crop={W}:{H},boxblur=24:2,eq=brightness=-0.08[bg];"
              f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-80[v]")
@@ -152,7 +198,7 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{int(H * 0.38)}:force_original_aspect_ratio=increase,"
              f"crop={W}:{int(H * 0.38)}[cam];[b]scale=-2:{H - int(H * 0.38)},crop={W}:{H - int(H * 0.38)}[game];[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
-    return v + f";[v]fps=30,subtitles='{sub}'[vo]"
+    return v.replace("[0:v]", inp) + f";[v]fps=30,subtitles='{sub}'[vo]"
 
 
 def game_offset(video, s0, e0, src, cam_box):
@@ -199,7 +245,7 @@ def game_offset(video, s0, e0, src, cam_box):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("job"); ap.add_argument("--pick", type=int, default=1)
-    ap.add_argument("--layout", choices=["fill", "blur", "facecam", "react"], default="blur")
+    ap.add_argument("--layout", choices=["fill", "blur", "focus", "facecam", "react"], default="blur")
     ap.add_argument("--title", default="", help="reaction title, e.g. 'Speed REALIZED why GTA 6 took 13 YEARS'")
     ap.add_argument("--title-style", choices=["box", "outline"], default="box")
     ap.add_argument("--title-secs", type=float, default=0, help="0 = whole clip")
@@ -208,11 +254,18 @@ def main():
     ap.add_argument("--allow-profanity", action="store_true", help="keep swear words in captions (slurs are always masked)")
     ap.add_argument("--cam", default="auto", help="auto (find the webcam) or x:y:w:h fractions")
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
+    ap.add_argument("--segments", default="", help='jump cuts in source seconds, e.g. "12.3-20,23.8-27.3,29.5-41.8"')
+    ap.add_argument("--focus", default="0:0.5", help='focus layout: "t:cx,..." keyframes, output seconds : centre x fraction')
+    ap.add_argument("--hook-secs", type=float, default=None, help="seconds the hook stays; 0 = whole clip (default for focus)")
+    ap.add_argument("--name", default="", help="output file stem, default clip_<pick>")
     a = ap.parse_args()
     d = Path(a.job); c = load_json(d / "candidates.json")
     pick = next(x for x in c["candidates"] if x["n"] == a.pick)
     s0 = a.start if a.start is not None else pick["start"]; e0 = a.end if a.end is not None else pick["end"]
     words = load_json(d / "transcript.json")
+    segs = parse_segments(a.segments)
+    if segs:
+        s0, e0 = segs[0][0], segs[-1][1]
     out = d / "edits"; out.mkdir(exist_ok=True)
     layout, cam, side = a.layout, a.cam, 'right'
     face_expr = None
@@ -261,24 +314,42 @@ def main():
             title = ('box', a.title, TOP, a.title_secs)
         else:
             title = ('outline', a.title, TOP + 40, a.title_secs)
-    ass = out / f"clip_{a.pick}.ass"
+    stem = a.name or f"clip_{a.pick}"
+    ass = out / f"{stem}.ass"
+    hook_secs = a.hook_secs if a.hook_secs is not None else (0 if layout == "focus" else 2.6)
     caps = a.captions
     cap_words = words if caps != 'none' else []
-    ass.write_text(build_ass(cap_words, s0, e0, a.hook, cap_y, title=title, caps=caps, profanity=a.allow_profanity), encoding="utf-8")
+    if segs:
+        cap_words, total = remap_words(cap_words, segs)
+        c_s, c_e = 0.0, total
+    else:
+        c_s, c_e = s0, e0
+    ass.write_text(build_ass(cap_words, c_s, c_e, a.hook, cap_y, title=title, caps=caps, profanity=a.allow_profanity,
+                             hook_secs=hook_secs, hook_y=120 if layout == "focus" else 170, hook_fs=80 if layout == "focus" else 68), encoding="utf-8")
     src = None; gx = None
     if layout == 'react':
         from common import ffprobe
         vs = [x for x in ffprobe(c['source'])['streams'] if x.get('codec_type') == 'video'][0]
         src = (int(vs['width']), int(vs['height']))
         gx = game_offset(c['source'], s0, e0, src, [float(t) for t in cam.split(':')])
-    v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr)
-    mp4 = out / f"clip_{a.pick}.mp4"
-    run([tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
-         "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+    mp4 = out / f"{stem}.mp4"
+    if segs:  # jump cuts: trim each segment, join, then lay out
+        if layout in ("react", "facecam"):
+            sys.exit("--segments works with fill, blur and focus")
+        parts = "".join(f"[0:v]trim={x:.2f}:{y:.2f},setpts=PTS-STARTPTS[v{i}];[0:a]atrim={x:.2f}:{y:.2f},asetpts=PTS-STARTPTS,"
+                        f"afade=t=in:d=0.03,afade=t=out:st={y - x - 0.03:.2f}:d=0.03[a{i}];" for i, (x, y) in enumerate(segs))
+        joined = "".join(f"[v{i}][a{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=1:a=1[vc][ac];"
+        v = parts + joined + video_filter(layout, cam, ass, inp="[vc]", focus=a.focus) + ";[ac]loudnorm=I=-14:TP=-1.5:LRA=11[ao]"
+        io = ["-i", c["source"], "-filter_complex", v, "-map", "[vo]", "-map", "[ao]"]
+    else:
+        v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr, focus=a.focus)
+        io = ["-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
+              "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"]
+    run([tool("ffmpeg"), "-y", "-v", "error", *io,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
     info = c.get("info", {})
-    save_json(out / f"clip_{a.pick}.json", {"file": str(mp4), "start": s0, "end": e0, "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
+    save_json(out / f"{stem}.json", {"file": str(mp4), "start": s0, "end": e0, "segments": segs, "source_views": info.get("view_count"), "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)

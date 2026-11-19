@@ -6,3 +6,10 @@ test/
 *.wav
 *.ts
 !docs/*.mp4
+
+# finished clips and captions are local
+media/
+clips.md
+clips.json
+trends.md
+streams.md
