@@ -12,8 +12,8 @@ Service: Upload-Post, Basic plan, $24 per month ($16 per month billed yearly). C
 1. Sign up at upload-post.com and take the Basic plan.
 2. Manage Users: create a profile. Its name is `UPLOAD_POST_USER`.
 3. In that profile, connect TikTok.
-4. API Keys: generate a key. Save it as the environment secret `UPLOAD_POST_KEY`. Never paste it in chat or commit it.
-5. Allow the host `api.upload-post.com` in the environment's network settings.
+4. API Keys: generate a key. In a Claude Code cloud session, save it through the secure credential form for `api.upload-post.com` (header `Authorization`, prefix `Apikey`); elsewhere set `UPLOAD_POST_KEY`. Never paste it in chat or commit it.
+5. Set `UPLOAD_POST_USER` to the profile name. Then post one clip with the human watching.
 
 ## Post
 

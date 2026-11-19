@@ -1,7 +1,8 @@
 """Upload a finished clip through Upload-Post (upload-post.com), with the source credit in the caption.
 
-Dry run by default: prints the exact caption and fields. Add --go to really post. Needs UPLOAD_POST_KEY and
-UPLOAD_POST_USER (the profile name from Upload-Post's "Manage Users") in the environment. TikTok allows 15 posts per account per 24 h.
+Dry run by default: prints the exact caption and fields. Add --go to really post. Needs UPLOAD_POST_USER (the profile
+name from Upload-Post's "Manage Users") and the API key, either as UPLOAD_POST_KEY or as a network secret for
+api.upload-post.com (header Authorization, prefix "Apikey"). TikTok allows 15 posts per account per 24 h.
 Fields follow docs.upload-post.com/api/upload-video; this script has not been run against a live account yet.
 
 usage: python post.py <clip.mp4> --caption "text" [--platform tiktok ...] [--at 2026-11-20T18:00:00 --tz America/Mexico_City] [--go]
@@ -48,9 +49,11 @@ def main():
         print(f"{k} = {v}")
     if not a.go:
         print("\ndry run. Add --go to post."); return
-    key = os.environ.get("UPLOAD_POST_KEY")
-    if not key or not os.environ.get("UPLOAD_POST_USER"):
-        sys.exit("set UPLOAD_POST_KEY and UPLOAD_POST_USER first")
+    if not os.environ.get("UPLOAD_POST_USER"):
+        sys.exit("set UPLOAD_POST_USER (the profile name in Upload-Post) first")
+    # The key comes from UPLOAD_POST_KEY, or is added by the environment's network secret for api.upload-post.com,
+    # which replaces this placeholder on the way out. It is never written to a file or the chat.
+    key = os.environ.get("UPLOAD_POST_KEY") or "placeholder-replaced-by-network-secret"
     import requests
     with open(clip, "rb") as f:
         r = requests.post(API, headers={"Authorization": f"Apikey {key}", "Idempotency-Key": clip.stem}, data=data,
