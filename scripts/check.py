@@ -75,7 +75,8 @@ def main():
     add("no banned terms in caption/hook", not hits, ", ".join(hits))
     if not a.allow_profanity:  # clean-language rule: nothing a person or a moderation model could hear or read
         from clean import heard_bad, is_bad
-        heard = heard_bad(clip) + heard_bad(clip, model="small")  # two models: one's miss is not a pass
+        # two models, two chunk alignments: one pass missing a word is not a pass
+        heard = heard_bad(clip) + heard_bad(clip, model="small") + heard_bad(clip, offset=2.5) + heard_bad(clip, model="small", offset=2.5)
         add("no swearing in the audio", not heard, ", ".join(f"{w} at {s:.1f}s" for s, e, w in heard))
         ass = clip.with_suffix(".ass")
         shown = []

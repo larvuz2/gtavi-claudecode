@@ -151,7 +151,13 @@ def focus_x(keys, cw):
 
 
 def parse_segments(spec):
-    return [tuple(float(x) for x in p.split("-")) for p in spec.split(",") if p.strip()]
+    """"12-20,7.3-9.3@0.5" -> [(12, 20, 1.0), (7.3, 9.3, 0.5)]: source seconds, then a speed (0.5 = half-speed replay)."""
+    out = []
+    for p in (x.strip() for x in spec.split(",") if x.strip()):
+        rng, _, sp = p.partition("@")
+        a, b = (float(x) for x in rng.split("-"))
+        out.append((a, b, float(sp) if sp else 1.0))
+    return out
 
 
 def lines_to_words(lines):
@@ -165,8 +171,9 @@ def lines_to_words(lines):
 
 def concat_segments(src, segs, dst):
     """Join the kept parts of the source into one file (near-lossless), so every layout works on jump cuts."""
-    parts = "".join(f"[0:v]trim={x:.3f}:{y:.3f},setpts=PTS-STARTPTS[v{i}];[0:a]atrim={x:.3f}:{y:.3f},asetpts=PTS-STARTPTS,"
-                    f"afade=t=in:d=0.03,afade=t=out:st={max(0, y - x - 0.03):.3f}:d=0.03[a{i}];" for i, (x, y) in enumerate(segs))
+    parts = "".join(f"[0:v]trim={x:.3f}:{y:.3f},setpts=(PTS-STARTPTS)/{sp}[v{i}];[0:a]atrim={x:.3f}:{y:.3f},asetpts=PTS-STARTPTS,"
+                    + (f"atempo={sp}," if sp != 1 else "")
+                    + f"afade=t=in:d=0.03,afade=t=out:st={max(0, (y - x) / sp - 0.03):.3f}:d=0.03[a{i}];" for i, (x, y, sp) in enumerate(segs))
     graph = parts + "".join(f"[v{i}][a{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=1:a=1[v][a]"
     run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(src), "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
          "-c:v", "libx264", "-preset", "fast", "-crf", "12", "-c:a", "aac", "-b:a", "256k", str(dst)])
@@ -176,9 +183,9 @@ def concat_segments(src, segs, dst):
 def remap_words(words, segs):
     """Words on the output timeline after jump cuts."""
     out, off = [], 0.0
-    for a, b in segs:
-        out += [dict(w, s=round(off + w["s"] - a, 2), e=round(off + min(w["e"], b) - a, 2)) for w in words if a <= w["s"] < b]
-        off += b - a
+    for a, b, sp in segs:
+        out += [dict(w, s=round(off + (w["s"] - a) / sp, 2), e=round(off + (min(w["e"], b) - a) / sp, 2)) for w in words if a <= w["s"] < b]
+        off += (b - a) / sp
     return out, off
 TOP = 730  # react layout: face panel height = seam y (even)
 GAME_H = H - TOP  # 1190
@@ -390,7 +397,7 @@ def main():
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
     if not a.allow_profanity:  # verify the finished clip like check.py does; mute anything still heard, re-mux the audio only
         for rnd in range(4):
-            left = heard_bad(mp4) + heard_bad(mp4, model="small")
+            left = heard_bad(mp4) + heard_bad(mp4, model="small") + heard_bad(mp4, offset=2.5) + heard_bad(mp4, model="small", offset=2.5)
             if not left:
                 break
             muted = merge(muted + [(max(0.0, float(x) - 0.25), float(max(y, x + 0.45))) for x, y, _ in left], pad=0.05)

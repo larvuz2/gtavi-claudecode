@@ -53,20 +53,20 @@ def _pcm(media, start=0.0, end=None):
     return np.frombuffer(subprocess.run(cmd, capture_output=True, check=True).stdout, np.int16).astype(np.float32) / 32768
 
 
-def heard_bad(media, start=0.0, end=None, model="medium", chunk=5.0, hop=2.5):
+def heard_bad(media, start=0.0, end=None, model="medium", chunk=5.0, hop=2.5, offset=0.0):
     """Swears spoken in media[start:end]: [(s, e, word)] relative to start.
     Transcribes overlapping short chunks: on a whole clip Whisper skips quiet or overlapping lines and its word
     times drift; on 5 s pieces it hears more and times words closely. A hit in any chunk counts."""
     pcm = _pcm(media, start, end)
     sr, hits = 16000, []
     n = len(pcm) / sr
-    t = 0.0
+    t = -offset if offset else 0.0  # offset shifts the chunk edges, so a word cut at one edge is whole in another pass
     while t < n:
-        seg = pcm[int(t * sr):int(min(n, t + chunk) * sr)]
+        seg = pcm[int(max(0.0, t) * sr):int(min(n, t + chunk) * sr)]
         if len(seg) > sr * 0.5:
             segs, _ = _model(model).transcribe(seg, word_timestamps=True, vad_filter=False, beam_size=5, language="en",
                                                condition_on_previous_text=False)
-            hits += [(round(t + x.start, 2), round(t + x.end, 2), x.word.strip()) for s in segs for x in (s.words or [])
+            hits += [(round(max(0.0, t) + x.start, 2), round(max(0.0, t) + x.end, 2), x.word.strip()) for s in segs for x in (s.words or [])
                      if is_bad(x.word)]
         if t + chunk >= n:
             break
