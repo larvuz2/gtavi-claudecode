@@ -388,6 +388,21 @@ def main():
     run([tool("ffmpeg"), "-y", "-v", "error", *io,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
+    if not a.allow_profanity:  # verify the finished clip like check.py does; mute anything still heard, re-mux the audio only
+        for rnd in range(4):
+            left = heard_bad(mp4) + heard_bad(mp4, model="small")
+            if not left:
+                break
+            muted = merge(muted + [(max(0.0, float(x) - 0.25), float(max(y, x + 0.45))) for x, y, _ in left], pad=0.05)
+            muted = [(max(0.0, float(x)), min(float(e0 - s0), float(y))) for x, y in muted]
+            print(f"clean: still heard {[(round(float(x), 1), w) for x, _, w in left]}, muted {muted}")
+            tmp = mp4.with_suffix(".tmp.mp4")
+            run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(mp4), "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
+                 "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", f"{mute_filter(muted)},loudnorm=I=-14:TP=-1.5:LRA=11",
+                 "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-shortest", "-movflags", "+faststart", str(tmp)])
+            tmp.replace(mp4)
+        else:
+            print("clean: WARNING swears still heard after 4 rounds; do not post this clip")
     info = c.get("info", {})
     save_json(out / f"{stem}.json", {"file": str(mp4), "start": s0, "end": e0, "segments": segs, "muted": muted, "clean": not a.allow_profanity, "source_views": info.get("view_count"), "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_file": orig_source, "source_url": info.get("webpage_url"), "source_title": info.get("title"),
