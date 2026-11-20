@@ -210,8 +210,15 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
             top = f"crop={cw}:{chh}:{even(sw * x)}:{even(sh * y)}"
         gw = even(sw * GAME_H / sh) if sw * GAME_H / sh >= W else W
         gx = game_x if game_x is not None else ((gw - W) if cam_side == 'left' else 0)
+        pre = ""
+        if trim_bottom > 0:  # game panel only: drop the source's bottom (a streamer's burned-in captions); the cam stays whole
+            gh_src = sh * (1 - trim_bottom)
+            gw2 = even(sw * GAME_H / gh_src) if sw * GAME_H / gh_src >= W else W
+            gx = min(gw2 - W, gx * gw2 / gw); gw = gw2
+            pre = f"crop=iw:floor(ih*{1 - trim_bottom:.3f}/2)*2:0:0,"
+            trim_bottom = 0.0
         v = (f"[0:v]split[a][b];[a]{top},scale={W}:{TOP}:force_original_aspect_ratio=increase,crop={W}:{TOP},setsar=1[cam];"
-             f"[b]scale={gw}:{GAME_H},crop={W}:{GAME_H}:{even(gx)}:0,setsar=1[game];[cam][game]vstack[v]")
+             f"[b]{pre}scale={gw}:{GAME_H},crop={W}:{GAME_H}:{even(gx)}:0,setsar=1[game];[cam][game]vstack[v]")
         if band:
             y0, bh, secs = band
             en = f":enable='lte(t,{secs})'" if secs > 0 else ''
@@ -285,7 +292,7 @@ def main():
     ap.add_argument("--hook-secs", type=float, default=None, help="seconds the hook stays; 0 = whole clip (default for focus)")
     ap.add_argument("--name", default="", help="output file stem, default clip_<pick>")
     ap.add_argument("--lines", default="", help='json [[start, end, "text"], ...] in source seconds: captions from the game subtitles')
-    ap.add_argument("--trim-bottom", type=float, default=0.0, help="fill/blur/focus: drop this fraction of the source's bottom")
+    ap.add_argument("--trim-bottom", type=float, default=0.0, help="fill/blur/focus/react: drop this fraction of the source's bottom (react: game panel only)")
     a = ap.parse_args()
     d = Path(a.job); c = load_json(d / "candidates.json")
     pick = next(x for x in c["candidates"] if x["n"] == a.pick)
@@ -362,8 +369,8 @@ def main():
         src = (int(vs['width']), int(vs['height']))
         gx = game_offset(c['source'], s0, e0, src, [float(t) for t in cam.split(':')])
     mp4 = out / f"{stem}.mp4"
-    if a.trim_bottom and layout in ("react", "facecam"):
-        sys.exit("--trim-bottom works with fill, blur and focus")
+    if a.trim_bottom and layout == "facecam":
+        sys.exit("--trim-bottom works with fill, blur, focus and react")
     v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr, focus=a.focus,
                      trim_bottom=a.trim_bottom)
     muted = []
