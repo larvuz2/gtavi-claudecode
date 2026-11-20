@@ -68,3 +68,7 @@ Would you let him drive? 👇             <- a question anyone can answer in one
 ```
 
 The streamer's name goes only in the credit line at the end. The hook must be true to the clip. `post.py` adds the credit line if it is missing. Log the source URL in `log.md`.
+
+## 6. Deliver to the human
+
+Never paste raw video URLs or bare file cards in chat. Add every finished clip to the human's **Clip Drop** artifact (one page, grouped by day, newest day first): a thumbnail, a Download button that opens the hosted MP4 (`treg host clip.mp4 --content-type video/mp4`, 7-day link), a Copy caption button, and the link's expiry date. Republish the same artifact so the link the human has keeps working, and reply with that one link.
