@@ -308,6 +308,7 @@ def main():
     ap.add_argument("--lines-time", choices=["source", "output"], default="source",
                     help="output: --lines times are already on the finished clip's timeline (narration from narrate.py)")
     ap.add_argument("--voice", default="", help="narration track (narrate.py voice.wav), mixed over the clip's own audio")
+    ap.add_argument("--lang", default="en", help="language spoken in the clip, for the swear check (en, es, ...)")
     ap.add_argument("--cap-y", type=int, default=0, help="caption centre height in px (default per layout); raise it above on-screen text")
     ap.add_argument("--bed-gain", type=float, default=0.3, help="volume of the clip's own audio under --voice")
     ap.add_argument("--trim-bottom", type=float, default=0.0, help="fill/blur/focus/react: drop this fraction of the source's bottom (react: game panel only)")
@@ -397,7 +398,7 @@ def main():
     muted = []
     if not a.allow_profanity:  # clean-language rule: silence every swear heard, plus any the captions know about
         from clean import heard_bad, is_bad, merge, mute_filter
-        hits = heard_bad(c["source"], s0, e0)
+        hits = heard_bad(c["source"], s0, e0, language=a.lang)
         cap_hits = [(w["s"] - c_s, w["e"] - c_s, w["w"]) for w in cap_words if c_s <= w["s"] < c_e and is_bad(w["w"])]
         # start early: the first sound of a word is enough to hear it
         muted = merge([(x - 0.25, max(y, x + 0.45)) for x, y, _ in hits] + [(x - 0.25, y + 0.25) for x, y, _ in cap_hits])
@@ -420,7 +421,9 @@ def main():
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
     if not a.allow_profanity:  # verify the finished clip like check.py does; mute anything still heard, re-mux the audio only
         for rnd in range(4):
-            left = heard_bad(mp4) + heard_bad(mp4, model="small") + heard_bad(mp4, offset=2.5) + heard_bad(mp4, model="small", offset=2.5)
+            L = a.lang
+            left = (heard_bad(mp4, language=L) + heard_bad(mp4, model="small", language=L) + heard_bad(mp4, offset=2.5, language=L)
+                    + heard_bad(mp4, model="small", offset=2.5, language=L))
             if not left:
                 break
             muted = merge(muted + [(max(0.0, float(x) - 0.25), float(max(y, x + 0.45))) for x, y, _ in left], pad=0.05)

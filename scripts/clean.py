@@ -11,7 +11,10 @@ import numpy as np
 SWEAR = re.compile(
     r"^(fuck\w*|f[u*]+ck\w*|motherfuck\w*|shit\w*|bullshit\w*|bitch\w*|cunt\w*|dick\w*|cock\w*|pussy\w*|ass|asses|asshole\w*|"
     r"bastard\w*|whore\w*|slut\w*|damn\w*|goddamn\w*|hell|crap\w*|piss\w*|wtf|stfu|"
-    r"nigg\w*|n[i1]gg?a\w*|f[a@]gg?\w*|retard\w*|tranny\w*|chink\w*|spic\w*|kike\w*)$", re.I)
+    r"nigg\w*|n[i1]gg?a\w*|f[a@]gg?\w*|retard\w*|tranny\w*|chink\w*|spic\w*|kike\w*|"
+    # Spanish
+    r"mierd\w*|pendej\w*|cabr[oó]n\w*|cabrona\w*|ching\w*|put[ao]s?|puto\w*|putas?|verga\w*|culer[oa]\w*|culo|"
+    r"jod[aeiao]\w*|joder|co[ñn]o|pinche\w*|mamad[ao]\w*|marica\w*|maric[oó]n\w*|perra|hijueputa\w*|chupa\w*)$", re.I)
 
 _MODEL = {}
 
@@ -53,7 +56,7 @@ def _pcm(media, start=0.0, end=None):
     return np.frombuffer(subprocess.run(cmd, capture_output=True, check=True).stdout, np.int16).astype(np.float32) / 32768
 
 
-def heard_bad(media, start=0.0, end=None, model="medium", chunk=5.0, hop=2.5, offset=0.0):
+def heard_bad(media, start=0.0, end=None, model="medium", chunk=5.0, hop=2.5, offset=0.0, language="en"):
     """Swears spoken in media[start:end]: [(s, e, word)] relative to start.
     Transcribes overlapping short chunks: on a whole clip Whisper skips quiet or overlapping lines and its word
     times drift; on 5 s pieces it hears more and times words closely. A hit in any chunk counts."""
@@ -64,7 +67,7 @@ def heard_bad(media, start=0.0, end=None, model="medium", chunk=5.0, hop=2.5, of
     while t < n:
         seg = pcm[int(max(0.0, t) * sr):int(min(n, t + chunk) * sr)]
         if len(seg) > sr * 0.5:
-            segs, _ = _model(model).transcribe(seg, word_timestamps=True, vad_filter=False, beam_size=5, language="en",
+            segs, _ = _model(model).transcribe(seg, word_timestamps=True, vad_filter=False, beam_size=5, language=language,
                                                condition_on_previous_text=False)
             hits += [(round(max(0.0, t) + x.start, 2), round(max(0.0, t) + x.end, 2), x.word.strip()) for s in segs for x in (s.words or [])
                      if is_bad(x.word)]

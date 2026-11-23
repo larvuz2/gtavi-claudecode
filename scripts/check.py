@@ -44,6 +44,7 @@ def banned_in(text):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("clip"); ap.add_argument("--campaign"); ap.add_argument("--caption", default="")
+    ap.add_argument("--lang", default="en", help="language spoken in the clip (en, es, ...)")
     ap.add_argument("--allow-profanity", action="store_true", help="skip the clean-language checks")
     a = ap.parse_args()
     clip = Path(a.clip)
@@ -76,7 +77,9 @@ def main():
     if not a.allow_profanity:  # clean-language rule: nothing a person or a moderation model could hear or read
         from clean import heard_bad, is_bad
         # two models, two chunk alignments: one pass missing a word is not a pass
-        heard = heard_bad(clip) + heard_bad(clip, model="small") + heard_bad(clip, offset=2.5) + heard_bad(clip, model="small", offset=2.5)
+        L = a.lang
+        heard = (heard_bad(clip, language=L) + heard_bad(clip, model="small", language=L) + heard_bad(clip, offset=2.5, language=L)
+                 + heard_bad(clip, model="small", offset=2.5, language=L))
         add("no swearing in the audio", not heard, ", ".join(f"{w} at {s:.1f}s" for s, e, w in heard))
         ass = clip.with_suffix(".ass")
         shown = []
