@@ -299,6 +299,11 @@ def main():
     ap.add_argument("--hook-secs", type=float, default=None, help="seconds the hook stays; 0 = whole clip (default for focus)")
     ap.add_argument("--name", default="", help="output file stem, default clip_<pick>")
     ap.add_argument("--lines", default="", help='json [[start, end, "text"], ...] in source seconds: captions from the game subtitles')
+    ap.add_argument("--lines-time", choices=["source", "output"], default="source",
+                    help="output: --lines times are already on the finished clip's timeline (narration from narrate.py)")
+    ap.add_argument("--voice", default="", help="narration track (narrate.py voice.wav), mixed over the clip's own audio")
+    ap.add_argument("--cap-y", type=int, default=0, help="caption centre height in px (default per layout); raise it above on-screen text")
+    ap.add_argument("--bed-gain", type=float, default=0.3, help="volume of the clip's own audio under --voice")
     ap.add_argument("--trim-bottom", type=float, default=0.0, help="fill/blur/focus/react: drop this fraction of the source's bottom (react: game panel only)")
     a = ap.parse_args()
     d = Path(a.job); c = load_json(d / "candidates.json")
@@ -307,6 +312,7 @@ def main():
     words = load_json(d / "transcript.json")
     if a.lines:
         words = lines_to_words(load_json(a.lines))
+    out_words = words if (a.lines and a.lines_time == "output") else None  # already on the output timeline
     segs = parse_segments(a.segments)
     out = d / "edits"; out.mkdir(exist_ok=True)
     stem = a.name or f"clip_{a.pick}"
@@ -315,6 +321,8 @@ def main():
         c["source"] = str(concat_segments(orig_source, segs, out / f"{stem}.src.mp4"))
         words, total = remap_words(words, segs)
         s0, e0 = 0.0, total
+    if out_words is not None:  # narration captions: shift onto the cut's own time base (s0 is 0 after --segments)
+        words = [dict(w, s=w["s"] + s0, e=w["e"] + s0) for w in out_words]
     layout, cam, side = a.layout, a.cam, 'right'
     face_expr = None
     if layout in ('react', 'facecam') and cam == 'auto':
@@ -352,7 +360,7 @@ def main():
             layout = 'blur'
     elif layout in ('react', 'facecam') and cam != 'auto':
         side = 'left' if float(cam.split(':')[0]) + float(cam.split(':')[2]) / 2 < 0.5 else 'right'
-    cap_y = CAP_Y[layout]
+    cap_y = a.cap_y or CAP_Y[layout]
     title, band = None, None
     if a.title and layout == 'react':
         n = len(wrap(a.title, 26 if a.title_style == 'box' else 24))
@@ -389,9 +397,18 @@ def main():
         muted = merge([(x - 0.25, max(y, x + 0.45)) for x, y, _ in hits] + [(x - 0.25, y + 0.25) for x, y, _ in cap_hits])
         muted = [(max(0.0, float(x)), min(float(e0 - s0), float(y))) for x, y in muted]
         print(f"clean: heard {[h[2] for h in hits]}, captions {[h[2] for h in cap_hits]}, muted {muted}")
-    af = ",".join(x for x in (mute_filter(muted) if muted else "", "loudnorm=I=-14:TP=-1.5:LRA=11") if x)
-    io = ["-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
-          "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", af]
+    def audio_args(extra_inputs_from=1):
+        """Audio: the clip's own sound (muted where it swears), or that sound as a quiet bed under the narration."""
+        mute = (mute_filter(muted) + ",") if muted else ""
+        if not a.voice:
+            return [], ["-map", "0:a?", "-af", mute + "loudnorm=I=-14:TP=-1.5:LRA=11"], None
+        n = extra_inputs_from
+        graph = (f"[0:a]{mute}volume={a.bed_gain}[bed];[{n}:a]apad[vox];"
+                 f"[bed][vox]amix=inputs=2:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[ao]")
+        return ["-i", a.voice], ["-map", "[ao]"], graph
+    vin, vmap, agraph = audio_args()
+    io = ["-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"], *vin,
+          "-filter_complex", v + (";" + agraph if agraph else ""), "-map", "[vo]", *vmap]
     run([tool("ffmpeg"), "-y", "-v", "error", *io,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
          "-ar", "48000", "-movflags", "+faststart", str(mp4)])
@@ -404,8 +421,15 @@ def main():
             muted = [(max(0.0, float(x)), min(float(e0 - s0), float(y))) for x, y in muted]
             print(f"clean: still heard {[(round(float(x), 1), w) for x, _, w in left]}, muted {muted}")
             tmp = mp4.with_suffix(".tmp.mp4")
+            if a.voice:  # a swear in the narration or the bed: mute the whole mix there
+                remix = ["-i", a.voice, "-filter_complex",
+                         f"[1:a]{mute_filter(muted)},volume={a.bed_gain}[bed];[2:a]apad,{mute_filter(muted)}[vox];"
+                         f"[bed][vox]amix=inputs=2:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[ao]",
+                         "-map", "0:v", "-map", "[ao]"]
+            else:
+                remix = ["-map", "0:v", "-map", "1:a", "-af", f"{mute_filter(muted)},loudnorm=I=-14:TP=-1.5:LRA=11"]
             run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(mp4), "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
-                 "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", f"{mute_filter(muted)},loudnorm=I=-14:TP=-1.5:LRA=11",
+                 *remix, "-c:v", "copy",
                  "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-shortest", "-movflags", "+faststart", str(tmp)])
             tmp.replace(mp4)
         else:
