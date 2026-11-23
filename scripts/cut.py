@@ -94,7 +94,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     # groups of up to 3 words, break on punctuation or pauses
     groups, cur = [], []
     for w in ws:
-        if cur and (len(cur) == 3 or w["s"] - cur[-1]["e"] > 0.6 or cur[-1]["w"][-1:] in ".?!,"):
+        if cur and (len(cur) == 3 or w["s"] - cur[-1]["e"] > 0.6 or cur[-1]["w"][-1:] in ".?!," or w.get("c") != cur[-1].get("c")):
             groups.append(cur); cur = []
         cur.append(w)
     if cur:
@@ -108,9 +108,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if b <= a:
                 continue
             parts = []
+            base = "&H00FFFFFF&"
+            if g[0].get("c"):  # speaker colour (RRGGBB -> ASS &HBBGGRR&); the spoken word is still highlighted yellow
+                c6 = g[0]["c"]; base = f"&H00{c6[4:6]}{c6[2:4]}{c6[0:2]}&"
             for j, x in enumerate(g):
                 t = esc(x["w"].upper())
-                parts.append("{\\c&H0000E5FF&}" + t + "{\\c&H00FFFFFF&}" if j == k else t)
+                parts.append("{\\c&H0000E5FF&}" + t + "{\\c" + base + "}" if j == k else t)
+            if base != "&H00FFFFFF&":
+                parts[0] = "{\\c" + base + "}" + parts[0]
             pop = "{\\fscx112\\fscy112\\t(0,90,\\fscx100\\fscy100)}" if k == 0 else ""
             if caps == 'bubble':
                 if k == 0:
@@ -163,9 +168,10 @@ def parse_segments(spec):
 def lines_to_words(lines):
     """[[start, end, "text"], ...] in source seconds -> word timings spread evenly over each line."""
     out = []
-    for a, b, text in lines:
+    for a, b, text, *col in lines:  # optional 4th item: the speaker's caption colour, RRGGBB
         ws = text.split(); step = (b - a) / max(len(ws), 1)
-        out += [{"w": w, "s": round(a + i * step, 2), "e": round(a + (i + 1) * step, 2)} for i, w in enumerate(ws)]
+        out += [dict({"w": w, "s": round(a + i * step, 2), "e": round(a + (i + 1) * step, 2)}, **({"c": col[0]} if col else {}))
+                for i, w in enumerate(ws)]
     return out
 
 

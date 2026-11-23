@@ -7,6 +7,8 @@ spec.json:
   "voice": "Fenrir",
   "style": "excited Latin American Spanish gaming streamer reacting live, fast, amazed",
   "gap": 0.15,
+  "tempo": 1.25,                                                             # optional speed-up, pitch kept
+  "speakers": {"A": {"voice": "Fenrir", "style": "...", "color": "FFFFFF"}},  # optional; a line picks one with "who"
   "lines": [
     {"text": "Espera... ¿ese capibara dispara confeti con una trompeta?",   # spoken (no ALL CAPS: TTS spells them)
      "caption": "Espera… ¿ese capibara dispara CONFETI con una trompeta?",   # shown (optional, defaults to text)
@@ -64,26 +66,40 @@ def main():
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     cache = out / "cache"; cache.mkdir(exist_ok=True)
     voice, style, gap = spec.get("voice", "Fenrir"), spec.get("style", ""), float(spec.get("gap", 0.15))
+    speakers = spec.get("speakers", {})  # "A": {"voice": "Fenrir", "style": "...", "color": "FFFFFF"}
     t, placed = 0.0, []
     for ln in spec["lines"]:
-        wav = speak(ln["text"], voice, style, cache)
+        who = speakers.get(ln.get("who", ""), {})
+        v = ln.get("voice", who.get("voice", voice))
+        st = ", ".join(x for x in (who.get("style", style), ln.get("mood", "")) if x)
+        wav = speak(ln["text"], v, st, cache)
+        tempo = float(ln.get("tempo", spec.get("tempo", 1.0)))
+        if tempo != 1.0:  # faster delivery, same pitch (real streamers talk fast)
+            fast = wav.with_name(f"{wav.stem}.x{tempo:g}.wav")
+            if not fast.exists():
+                subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(wav), "-af", f"atempo={tempo}", str(fast)], check=True)
+            wav = fast
         d = duration(wav)
+        cap = ln.get("caption", ln["text"])
         start = float(ln["at"]) if "at" in ln else t
-        placed.append((start, start + d, ln.get("caption", ln["text"]), wav))
-        t = start + d + gap
+        if cap:  # captioned lines never overlap each other; uncaptioned shouts may overlap anything
+            start = max(start, t)
+        placed.append((start, start + d, cap, wav, who.get("color", "")))
+        if cap:
+            t = start + d + gap
     # one voice track: each line delayed to its start, mixed
     ins, chains = [], []
-    for i, (s, e, _, wav) in enumerate(placed):
+    for i, (s, e, _, wav, _c) in enumerate(placed):
         ins += ["-i", str(wav)]
         chains.append(f"[{i}:a]adelay={int(s * 1000)}:all=1[d{i}]")
     graph = ";".join(chains) + ";" + "".join(f"[d{i}]" for i in range(len(placed))) + \
         f"amix=inputs={len(placed)}:normalize=0:duration=longest[v]"
     subprocess.run(["ffmpeg", "-y", "-v", "error", *ins, "-filter_complex", graph, "-map", "[v]", "-ar", "48000", "-ac", "1",
                     str(out / "voice.wav")], check=True)
-    lines = [[round(s, 2), round(e, 2), cap] for s, e, cap, _ in placed]
+    lines = [[round(s, 2), round(e, 2), cap] + ([col] if col else []) for s, e, cap, _, col in placed if cap]
     (out / "lines.json").write_text(json.dumps(lines, ensure_ascii=False, indent=1), encoding="utf-8")
-    for s, e, cap in lines:
-        print(f"{s:6.2f}-{e:6.2f}  {cap}")
+    for s, e, cap, _w, _c in placed:
+        print(f"{s:6.2f}-{e:6.2f}  {cap or '(shout, no caption)'}")
     print(f"voice: {out / 'voice.wav'} ({duration(out / 'voice.wav'):.1f}s)")
 
 
