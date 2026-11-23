@@ -28,15 +28,16 @@ The Drive connector cannot download files over 10 MB. Download with
 4. **High arousal**: surprise, absurdity, danger (Berger & Milkman). Calm shots only as a breath before a reveal.
 5. **Every key word lands on its shot**: when the voice says "Groove Gun", the Groove Gun is on screen.
 
-## 4. Write and voice the narration
+## 4. Write and voice the reactions (not a narration)
 
-Spec file per clip (see `jobs/_capy/spec/*.json`), then
-`python scripts/narrate.py spec.json --out jobs/_capy/narr_<clip>`.
+Three friends playing live and reacting to exactly what is on screen: shouts, laughs, "¡wey, wey, wey!", "¡no manches!". Never an ad voice. Spec per clip in `jobs/_capy/spec/*.json`, then
+`python scripts/narrate.py spec.json --out jobs/_capy/narr2_<clip>`.
 
-- Voice: Gemini 3.8 Flash TTS through treg, voice `Fenrir`, style "very fast, high-energy Latin American Spanish gaming streamer reacting live on stream, amazed, laughing, punchy". About $0.001 per line.
-- Streamer voice: first person, reacting ("¡No, no, no!", "Espera…"), short lines of 2 to 3 seconds, a question at the end that anyone can answer in a comment.
+- Speakers (Gemini 3.8 Flash TTS via treg, about $0.001 a line): A `Fenrir` (male, intense, white captions), B `Puck` (male, goofy, light blue), C `Kore` (female, screams and laughs, pink). Each line has `who`, `text`, `mood` (shocked, laughing, panicking...) and `at`.
+- `"tempo": 1.25` (1.3 for montages): real streamers talk fast.
+- Lines of 1 to 6 words, one reaction per shot. A key word lands on its shot ("¡chuza!" as the pins fall).
+- `"caption": ""` makes a shout or laugh that can overlap others without a caption.
 - Spoken text has no ALL CAPS (the TTS spells them); put the emphasis in `caption`.
-- Place each line with `at` so its key word falls on the right shot. The narration sets the clip's length.
 - Never claim features the footage does not show.
 
 ## 5. Cut
@@ -44,10 +45,12 @@ Spec file per clip (see `jobs/_capy/spec/*.json`), then
 ```
 python scripts/cut.py jobs/<job> --layout focus --name <clip> --segments "..." --focus "..." \
   --lines jobs/_capy/narr_<clip>/lines.json --lines-time output --voice jobs/_capy/narr_<clip>/voice.wav \
-  --bed-gain 0.3 --hook "Este capibara pelea con una TROMPETA" [--cap-y 1180]
+  --bed-gain 0.3 --lang es --hook "Este capibara pelea con una TROMPETA" [--cap-y 1180]
 ```
 
 - The game's own audio stays underneath at 30 %.
+- `--lang es`: the swear check listens in Spanish (forced English heard "no manches" as "damn").
+- When the game shows big text low on screen, move captions below it with `--cap-y 1540` or above it with `--cap-y 1180`.
 - On title cards, keep the object centred and raise captions with `--cap-y 1180` so they sit above the card's text.
 - Check frame 1 and a 2 fps sheet; fix cropped text or subjects and re-cut.
 - Run `rule-check`. Deliver on the Clip Drop page (viral-clips step 6).
