@@ -54,3 +54,17 @@ python scripts/cut.py jobs/<job> --layout focus --name <clip> --segments "..." -
 - On title cards, keep the object centred and raise captions with `--cap-y 1180` so they sit above the card's text.
 - Check frame 1 and a 2 fps sheet; fix cropped text or subjects and re-cut.
 - Run `rule-check`. Deliver on the Clip Drop page (viral-clips step 6).
+
+## Two kinds of video
+
+**Social clips** (TikTok, Reels, Shorts): the vertical process above. Hooks, chaos, three streamer voices.
+
+**Dev diaries** (Reddit, then vertical once approved): developer to developer, what we built and why.
+
+1. Horizontal first. The human approves the horizontal cut on the Clip Drop page; only then make the vertical version. Both must end up on the page.
+2. English for Reddit (r/IndieDev, r/indiegames, r/gamedev). One idea per video, matched to the director's idea list.
+3. Narration: one calm voice (`Charon`, style "calm, friendly indie game developer talking to fellow developers in a devlog video, relaxed, conversational, unhurried, warm", tempo 1.05). Say only what the footage shows; design reasoning is fine, invented tech details are not. End with one tip and one question for the comments.
+4. Speed: walking, menus and software footage at 2x or 3x (`a-b@2`), the feature itself at 1x, small UI text at 0.5x so it can be read. A "2× SPEED" badge appears automatically.
+5. Render: `python scripts/devdiary.py --src <video> --segments "..." --lines narr/lines.json --voice narr/voice.wav --title "How you pick your next map" --out jobs/<x>/out/<name>.mp4`
+   (1920x1080, sentence subtitles above the HUD, "CAPYVERSE · DEV DIARY" tag for the first 4.6 s, swear check).
+6. For the Clip Drop page, two-pass encode under 20 MB (about 18 MB) and keep the `_master.mp4` for direct uploads. The page copy is a Reddit TITLE and BODY, not a TikTok caption.

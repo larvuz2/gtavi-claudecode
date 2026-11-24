@@ -11,7 +11,7 @@ usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|focus|facecam|react]
 import argparse, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from common import load_json, run, save_json, tool
+from common import ffprobe, load_json, run, save_json, tool
 
 W, H = 1080, 1920
 
@@ -176,13 +176,29 @@ def lines_to_words(lines):
 
 
 def concat_segments(src, segs, dst):
-    """Join the kept parts of the source into one file (near-lossless), so every layout works on jump cuts."""
-    parts = "".join(f"[0:v]trim={x:.3f}:{y:.3f},setpts=(PTS-STARTPTS)/{sp}[v{i}];[0:a]atrim={x:.3f}:{y:.3f},asetpts=PTS-STARTPTS,"
-                    + (f"atempo={sp}," if sp != 1 else "")
-                    + f"afade=t=in:d=0.03,afade=t=out:st={max(0, (y - x) / sp - 0.03):.3f}:d=0.03[a{i}];" for i, (x, y, sp) in enumerate(segs))
-    graph = parts + "".join(f"[v{i}][a{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=1:a=1[v][a]"
-    run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(src), "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
-         "-c:v", "libx264", "-preset", "fast", "-crf", "12", "-c:a", "aac", "-b:a", "256k", str(dst)])
+    """Join the kept parts of the source into one file (near-lossless), so every layout works on jump cuts.
+    Each part is cut on its own with input seeking, then the parts are joined: memory stays flat however long the
+    source is and in whatever order the parts come."""
+    dst = Path(dst); tmp = dst.with_suffix(".parts"); tmp.mkdir(exist_ok=True)
+    has_audio = any(s.get("codec_type") == "audio" for s in ffprobe(src).get("streams", []))
+    listing = []
+    for i, (x, y, sp) in enumerate(segs):
+        part = tmp / f"p{i:03d}.mp4"
+        vf = f"setpts=(PTS-STARTPTS)/{sp},fps=30"
+        af = ("atempo={},".format(sp) if sp != 1 else "") + f"afade=t=in:d=0.03,afade=t=out:st={max(0, (y - x) / sp - 0.03):.3f}:d=0.03"
+        cmd = [tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{x:.3f}", "-to", f"{y:.3f}", "-i", str(src)]
+        if not has_audio:
+            cmd += ["-f", "lavfi", "-t", f"{(y - x):.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+        cmd += ["-vf", vf, "-af", af, "-map", "0:v", "-map", "0:a" if has_audio else "1:a",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "12", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-ac", "2", str(part)]
+        run(cmd)
+        listing.append(f"file '{part.resolve()}'")
+    (tmp / "list.txt").write_text("\n".join(listing) + "\n")
+    run([tool("ffmpeg"), "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(tmp / "list.txt"), "-c", "copy", str(dst)])
+    for f in tmp.iterdir():
+        f.unlink()
+    tmp.rmdir()
     return dst
 
 
