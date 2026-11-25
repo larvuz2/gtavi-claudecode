@@ -68,3 +68,9 @@ python scripts/cut.py jobs/<job> --layout focus --name <clip> --segments "..." -
 5. Render: `python scripts/devdiary.py --src <video> --segments "..." --lines narr/lines.json --voice narr/voice.wav --title "How you pick your next map" --out jobs/<x>/out/<name>.mp4`
    (1920x1080, sentence subtitles above the HUD, "CAPYVERSE · DEV DIARY" tag for the first 4.6 s, swear check).
 6. For the Clip Drop page, two-pass encode under 20 MB (about 18 MB) and keep the `_master.mp4` for direct uploads. The page copy is a Reddit TITLE and BODY, not a TikTok caption.
+
+## Dev diary voice: Bob (approved)
+
+Bob's cloned voice (Fish Audio private voice `fadb671a817e4d6e820b63903b83c636`, via treg) mastered with `scripts/vo_master.py --preset studio_warm`. Spec: `"engine": "fish"`, `"reference_id"`, `"master": false`, then master the voice.wav with Studio Warm before `devdiary.py`. Example: `example_dev_diary_spec.json`. Spell "Capy-verse" in spoken text so it is not read as "Capybars".
+
+Footage from the developer comes as short pieces: editing in the engine (Blueprints, particle editor, curves) then testing that change in game. Cut each pair as editor at 3x, then the test at 1x, with the narration line that names the change landing on the test.
