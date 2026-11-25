@@ -74,3 +74,12 @@ python scripts/cut.py jobs/<job> --layout focus --name <clip> --segments "..." -
 Bob's cloned voice (Fish Audio private voice `fadb671a817e4d6e820b63903b83c636`, via treg) mastered with `scripts/vo_master.py --preset studio_warm`. Spec: `"engine": "fish"`, `"reference_id"`, `"master": false`, then master the voice.wav with Studio Warm before `devdiary.py`. Example: `example_dev_diary_spec.json`. Spell "Capy-verse" in spoken text so it is not read as "Capybars".
 
 Footage from the developer comes as short pieces: editing in the engine (Blueprints, particle editor, curves) then testing that change in game. Cut each pair as editor at 3x, then the test at 1x, with the narration line that names the change landing on the test.
+
+## Dev diary opening and close (every dev diary)
+
+1. First two spec lines, uncaptioned: `{"at":0.2,"text":"(excited) Hey! Welcome to another dev,","caption":""}` and `{"at":2.75,"text":"(excited) Diary!","caption":""}`. The pause between "dev" and "diary" is the signature. `(excited)` is a Fish Audio emotion marker; it is not spoken.
+2. Narration starts at 3.7 s; start the footage with a 3.7 s energetic shot (it is dimmed behind the logo).
+3. Last line: `{"text":"(excited) Let's gooo!","caption":"Let's gooo!"}` right after the closing question, with 1 to 1.5 s of footage under it.
+4. Find when "dev" is said (Whisper word timestamps on that line), render with `devdiary.py ... --title-start 3.7`, then
+   `python scripts/dd_intro.py base.mp4 out.mp4 --dev <t> --diary 2.75 --end 3.7`.
+   Art: `brand/dev_alpha.png`, `brand/diary_alpha.png` (made with Nano Banana Pro from the Capyverse Odyssey logo, green background keyed out).

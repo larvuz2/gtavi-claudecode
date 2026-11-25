@@ -39,7 +39,7 @@ def wrap2(s, width=46):
     return s[:cut] + "\\N" + s[cut + 1:] if cut > 0 else s
 
 
-def build_ass(lines, title, tag, fast, total):
+def build_ass(lines, title, tag, fast, total, t0=0.0):
     hdr = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -61,9 +61,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         for s, e, c in chunks(text, a, b):
             ev.append(f"Dialogue: 0,{ts(s)},{ts(e)},Sub,,0,0,0,,{{\\fad(80,80)}}{wrap2(esc(c))}")
     if tag:
-        ev.append(f"Dialogue: 1,{ts(0)},{ts(4.6)},Tag,,0,0,0,,{{\\fad(150,250)}}{esc(tag)}")
+        ev.append(f"Dialogue: 1,{ts(t0)},{ts(t0 + 4.6)},Tag,,0,0,0,,{{\\fad(150,250)}}{esc(tag)}")
     if title:
-        ev.append(f"Dialogue: 1,{ts(0)},{ts(4.6)},Title,,0,0,0,,{{\\fad(150,250)}}{esc(title)}")
+        ev.append(f"Dialogue: 1,{ts(t0)},{ts(t0 + 4.6)},Title,,0,0,0,,{{\\fad(150,250)}}{esc(title)}")
     for a, b, sp in fast:
         ev.append(f"Dialogue: 1,{ts(a)},{ts(b)},Badge,,0,0,0,,{sp:g}× SPEED")
     return hdr + "\n".join(ev) + "\n"
@@ -73,7 +73,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", required=True); ap.add_argument("--segments", required=True)
     ap.add_argument("--lines", required=True); ap.add_argument("--voice", required=True)
-    ap.add_argument("--title", default=""); ap.add_argument("--tag", default="CAPYVERSE  ·  DEV DIARY")
+    ap.add_argument("--title", default=""); ap.add_argument("--title-start", type=float, default=0.0); ap.add_argument("--tag", default="CAPYVERSE  ·  DEV DIARY")
     ap.add_argument("--bed-gain", type=float, default=0.25); ap.add_argument("--out", required=True)
     ap.add_argument("--lang", default="en")
     a = ap.parse_args()
@@ -89,7 +89,7 @@ def main():
     total = t
     lines = json.loads(Path(a.lines).read_text(encoding="utf-8"))
     ass = out.with_suffix(".ass")
-    ass.write_text(build_ass(lines, a.title, a.tag, fast, total), encoding="utf-8")
+    ass.write_text(build_ass(lines, a.title, a.tag, fast, total, a.title_start), encoding="utf-8")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
     graph = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,"
              f"subtitles='{sub}'[vo];[0:a]volume={a.bed_gain}[bed];[1:a]apad[vox];"

@@ -2,37 +2,52 @@
  "engine": "fish",
  "reference_id": "fadb671a817e4d6e820b63903b83c636",
  "master": false,
- "gap": 0.3,
+ "gap": 0.25,
  "tempo": 1.0,
  "lines": [
   {
-   "at": 0.3,
-   "text": "Seagull week in Capy-verse! Here's what I've been building.",
-   "caption": "Seagull week in Capyverse! Here's what I've been building."
+   "at": 0.2,
+   "text": "(excited) Hey! Welcome to another dev,",
+   "caption": ""
   },
   {
-   "at": 3.2,
+   "at": 2.75,
+   "text": "(excited) Diary!",
+   "caption": ""
+  },
+  {
+   "at": 4.0,
+   "text": "This week: seagulls! Here's what I've been building.",
+   "caption": "This week: seagulls! Here's what I've been building."
+  },
+  {
+   "at": 6.9,
    "text": "First, the legendary seagull. I set it up in Blueprints so that on the third enemy it hits... it explodes."
   },
   {
-   "at": 9.3,
+   "at": 13.0,
    "text": "And... boom! There it is."
   },
   {
-   "at": 12.8,
+   "at": 16.5,
    "text": "Next, meteor seagulls. I made a new particle effect, so every impact leaves a mark on the ground."
   },
   {
-   "at": 21.0,
+   "at": 24.7,
    "text": "Then the shockwave. A curve controls how fast the ring grows, and how it fades out."
   },
   {
-   "at": 27.6,
+   "at": 31.3,
    "text": "Run it in the game, and the ring pushes out right from the capybara."
   },
   {
-   "at": 33.0,
+   "at": 36.7,
    "text": "And it all stacks: multiple seagulls can drop at once! So, what should the next seagull do? Tell me in the comments!"
+  },
+  {
+   "at": 44.05,
+   "text": "(excited) Let's gooo!",
+   "caption": "Let's gooo!"
   }
  ]
 }
