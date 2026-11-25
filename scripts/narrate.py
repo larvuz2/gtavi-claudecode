@@ -52,6 +52,38 @@ def speak(text, voice, style, cache):
     return wav
 
 
+FISH = "fishaudio.tts.s2-1-pro"
+# broadcast voice-over chain: rumble cut, heavy low end, less mud, presence and air, de-ess, compression, a little room
+MASTER = ("highpass=f=60,afftdn=nf=-35,"
+          "equalizer=f=110:t=q:w=0.9:g=5,equalizer=f=300:t=q:w=1.2:g=-3,equalizer=f=3500:t=q:w=1.0:g=3,"
+          "treble=g=2:f=10000,deesser=i=0.4,"
+          "acompressor=threshold=-20dB:ratio=3:attack=5:release=80:makeup=3,"
+          "aecho=0.9:0.35:28|47:0.10|0.06,alimiter=limit=0.9")
+
+
+def speak_fish(text, ref, cache, speed=1.0):
+    """Cloned voice (Fish Audio S2.1 Pro, a private voice id) through treg."""
+    key = hashlib.sha1(f"fish|{ref}|{speed}|{text}".encode()).hexdigest()[:16]
+    wav = cache / f"{key}.wav"
+    if wav.exists():
+        return wav
+    body = {"text": text, "reference_id": ref, "format": "wav", "sample_rate": 44100, "prosody": {"speed": speed},
+            "temperature": 0.7, "top_p": 0.7}
+    req = cache / f"{key}.req.json"
+    req.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+    raw = cache / f"{key}.raw.wav"
+    with open(raw, "wb") as fh:
+        r = subprocess.run(["treg", "call", FISH, "--method", "POST", "-H", "model: s2.1-pro", "--data", f"@{req}"], stdout=fh, stderr=subprocess.PIPE, text=False)
+    if r.returncode != 0 or raw.stat().st_size < 2000:
+        sys.exit(f"Fish TTS failed for {text!r}: {r.stderr.decode(errors='replace')[-300:]}")
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(raw), "-af",
+                    "silenceremove=start_periods=1:start_threshold=-45dB,areverse,"
+                    "silenceremove=start_periods=1:start_threshold=-45dB,areverse", "-ar", "48000", "-ac", "1", str(wav)],
+                   check=True)
+    print(f"tts(fish): {text[:50]!r} -> {wav.name}")
+    return wav
+
+
 def duration(path):
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
                        capture_output=True, text=True)
@@ -72,7 +104,11 @@ def main():
         who = speakers.get(ln.get("who", ""), {})
         v = ln.get("voice", who.get("voice", voice))
         st = ", ".join(x for x in (who.get("style", style), ln.get("mood", "")) if x)
-        wav = speak(ln["text"], v, st, cache)
+        engine = ln.get("engine", who.get("engine", spec.get("engine", "gemini")))
+        if engine == "fish":
+            wav = speak_fish(ln["text"], who.get("reference_id", spec.get("reference_id")), cache, float(spec.get("fish_speed", 1.0)))
+        else:
+            wav = speak(ln["text"], v, st, cache)
         tempo = float(ln.get("tempo", spec.get("tempo", 1.0)))
         if tempo != 1.0:  # faster delivery, same pitch (real streamers talk fast)
             fast = wav.with_name(f"{wav.stem}.x{tempo:g}.wav")
@@ -94,6 +130,8 @@ def main():
         chains.append(f"[{i}:a]adelay={int(s * 1000)}:all=1[d{i}]")
     graph = ";".join(chains) + ";" + "".join(f"[d{i}]" for i in range(len(placed))) + \
         f"amix=inputs={len(placed)}:normalize=0:duration=longest[v]"
+    if spec.get("master"):  # broadcast polish on the whole voice track
+        graph = graph.replace("[v]", "[m]") + ";[m]" + MASTER + "[v]"
     subprocess.run(["ffmpeg", "-y", "-v", "error", *ins, "-filter_complex", graph, "-map", "[v]", "-ar", "48000", "-ac", "1",
                     str(out / "voice.wav")], check=True)
     lines = [[round(s, 2), round(e, 2), cap] + ([col] if col else []) for s, e, cap, _, col in placed if cap]
