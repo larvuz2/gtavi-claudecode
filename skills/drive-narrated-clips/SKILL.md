@@ -87,3 +87,12 @@ Footage from the developer comes as short pieces: editing in the engine (Bluepri
 
 
 Several clips from Bob for one diary: join them into one file first (ffmpeg concat filter, fps 30), then offset the second clip's times by the first clip's length. Bob's text file says what each clip shows; the script follows it, nothing more.
+
+
+## Dev diary look (current)
+
+- DEV: wooden sign (`brand/dev_alpha.png`). DIARY: wooden sign wrapped in ivy (`brand/diary_alpha.png`, keyed from a magenta background since the leaves are green).
+- No "CAPYVERSE · DEV DIARY" tag and no small title: pass `--tag "" --title ""`.
+- The headline is thrown word by word, big and centred, synced to Bob saying it: get his word times with Whisper, then
+  `--title-words "THE@4.72,CLOWN@5.18,BOSS@5.44,|GOT@5.66,MEANER@5.92" --title-end 7.0` (`|` starts the second line). Subtitles for that line are skipped automatically.
+- Music: `--music brand/devdiary_music_01.mp3` (Lyria 3 Clip, playful carnival instrumental). It sits about 10 dB under Bob and ducks further whenever he speaks.

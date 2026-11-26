@@ -26,7 +26,7 @@ def pop(t):
 def frame(t, dev, diary, end, a_dev, a_diary):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     out_k = 0.0 if t < end - 0.25 else min(1.0, (t - (end - 0.25)) / 0.25)    # punch out in the last 0.25 s
-    for art, t0, cy, width in ((a_dev, dev, 395, 980), (a_diary, diary, 760, 1060)):
+    for art, t0, cy, width in ((a_dev, dev, 300, 880), (a_diary, diary, 780, 1060)):
         s = pop(t - t0)
         if s <= 0:
             continue
