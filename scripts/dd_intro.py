@@ -10,6 +10,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 W, H, FPS = 1920, 1080, 30
+POS = ((300, 880), (780, 1060))  # (centre y, width) of DEV and DIARY; vertical: ((700, 940), (1150, 1000))
 
 
 def pop(t):
@@ -26,7 +27,7 @@ def pop(t):
 def frame(t, dev, diary, end, a_dev, a_diary):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     out_k = 0.0 if t < end - 0.25 else min(1.0, (t - (end - 0.25)) / 0.25)    # punch out in the last 0.25 s
-    for art, t0, cy, width in ((a_dev, dev, 300, 880), (a_diary, diary, 780, 1060)):
+    for art, t0, (cy, width) in zip((a_dev, a_diary), (dev, diary), POS):
         s = pop(t - t0)
         if s <= 0:
             continue
@@ -50,7 +51,11 @@ def main():
     ap.add_argument("--end", type=float, required=True)
     ap.add_argument("--chime", default=str(ROOT / "brand/reveal_chime.wav"), help="reveal sound started on DIARY ('' for none)")
     ap.add_argument("--chime-gain", type=float, default=0.6)
+    ap.add_argument("--vertical", action="store_true", help="1080x1920 layout")
     a = ap.parse_args()
+    global W, H, POS
+    if a.vertical:
+        W, H, POS = 1080, 1920, ((700, 940), (1150, 1000))
     a_dev = Image.open(ROOT / "brand/dev_alpha.png").convert("RGBA")
     a_diary = Image.open(ROOT / "brand/diary_alpha.png").convert("RGBA")
     with tempfile.TemporaryDirectory() as td:

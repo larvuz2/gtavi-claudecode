@@ -110,3 +110,10 @@ The opening is four fixed audio takes in `brand/opening/`, never regenerated: `0
 Under the opening, quiet blaster fire: mix `brand/sfx_blasters.mp3` (Epidemic Sound via Higgsfield) into the mastered voice for 0-5.2 s at volume 0.18 with fades.
 Music default gain is now 0.3 with gentle ducking; Bob stays on top.
 When re-rendering an approved diary, copy its narr cache first so approved takes are reused, not regenerated.
+
+## Vertical version of an approved dev diary
+
+Same footage, same audio, new layout:
+`python scripts/devdiary_vertical.py --src out/<x>_base.src.mp4 --audio out/<x>_master.mp4 --lines narr/lines.json --segments "..." --title-words "..." --title-end <t> --out out/<x>_vert_base.mp4`
+then `python scripts/dd_intro.py out/<x>_vert_base.mp4 out/<x>_vert_master.mp4 --dev 3.27 --diary 4.02 --end 5.07 --vertical --chime ""` (the chime is already in the horizontal audio).
+Put it in the same Clip Drop section as the horizontal one, with a short TikTok-style caption.
