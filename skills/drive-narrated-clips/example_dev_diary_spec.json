@@ -5,40 +5,45 @@
  "lines": [
   {
    "at": 0.2,
-   "text": "(excited) Hey! Welcome to... Dev!",
+   "text": "(excited) Hey, this is Bob!",
    "caption": ""
   },
   {
-   "at": 2.95,
+   "at": 1.75,
+   "text": "(excited) And welcome to... Dev!",
+   "caption": ""
+  },
+  {
+   "at": 4.02,
    "text": "(excited) Diary!",
    "caption": ""
   },
   {
-   "at": 4.2,
+   "at": 5.27,
    "text": "This week, our clown boss got meaner."
   },
   {
-   "at": 6.6,
+   "at": 7.67,
    "text": "We animated a brand new close-range attack, then brought it into the engine."
   },
   {
-   "at": 12.8,
+   "at": 13.87,
    "text": "Get too close... and he slams the ground. Twice!"
   },
   {
-   "at": 17.5,
+   "at": 18.57,
    "text": "Next, hitboxes. His body takes normal damage, but his nose?"
   },
   {
-   "at": 22.0,
+   "at": 23.07,
    "text": "Double damage!"
   },
   {
-   "at": 25.3,
+   "at": 26.37,
    "text": "So, where would you aim? Tell me in the comments!"
   },
   {
-   "at": 28.6,
+   "at": 29.67,
    "text": "(excited) Let's gooo!",
    "caption": "Let's gooo!"
   }

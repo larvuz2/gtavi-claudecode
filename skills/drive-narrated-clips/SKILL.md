@@ -96,3 +96,9 @@ Several clips from Bob for one diary: join them into one file first (ffmpeg conc
 - The headline is thrown word by word, big and centred, synced to Bob saying it: get his word times with Whisper, then
   `--title-words "THE@4.72,CLOWN@5.18,BOSS@5.44,|GOT@5.66,MEANER@5.92" --title-end 7.0` (`|` starts the second line). Subtitles for that line are skipped automatically.
 - Music: `--music brand/devdiary_music_01.mp3` (Lyria 3 Clip, playful carnival instrumental). It sits about 10 dB under Bob and ducks further whenever he speaks.
+
+
+## Opening v3 (current)
+
+Three uncaptioned lines: `{"at":0.2,"text":"(excited) Hey, this is Bob!"}`, `{"at":1.75,"text":"(excited) And welcome to... Dev!"}` ("Dev" lands 1.5 s into the line, after the pause, so 3.25 s), `{"at":4.02,"text":"(excited) Diary!"}`. Narration starts at 5.27 s; `dd_intro.py --dev 3.25 --diary 4.02 --end 5.07`, `--title-start`/title words from ~5.3 s. Fill 0-5.07 s with one striking shot (slow it with `@0.8` if short).
+DIARY art is now the DEV typography (cream-white) with ivy only, no wooden plank (`brand/diary_alpha.png`, made with both the logo and the DEV image as references).
