@@ -77,9 +77,12 @@ Footage from the developer comes as short pieces: editing in the engine (Bluepri
 
 ## Dev diary opening and close (every dev diary)
 
-1. First two spec lines, uncaptioned: `{"at":0.2,"text":"(excited) Hey! Welcome to another dev,","caption":""}` and `{"at":2.75,"text":"(excited) Diary!","caption":""}`. The pause between "dev" and "diary" is the signature. `(excited)` is a Fish Audio emotion marker; it is not spoken.
-2. Narration starts at 3.7 s; start the footage with a 3.7 s energetic shot (it is dimmed behind the logo).
+1. First two spec lines, uncaptioned: `{"at":0.2,"text":"(excited) Hey! Welcome to... Dev!","caption":""}` and `{"at":2.95,"text":"(excited) Diary!","caption":""}` (tested: other spellings make "dev" sound like "the" or "dead"; "Die-uh-ree" and "Dye-uh-ree" go wrong). Reuse the cached takes in `jobs/_clown/narr/cache` when present so the opening sounds identical every time. The pause between "dev" and "diary" is the signature. `(excited)` is a Fish Audio emotion marker; it is not spoken.
+2. Narration starts at 4.0 s; start the footage with a 4.0 s energetic shot (it is dimmed behind the logo).
 3. Last line: `{"text":"(excited) Let's gooo!","caption":"Let's gooo!"}` right after the closing question, with 1 to 1.5 s of footage under it.
-4. Find when "dev" is said (Whisper word timestamps on that line), render with `devdiary.py ... --title-start 3.7`, then
-   `python scripts/dd_intro.py base.mp4 out.mp4 --dev <t> --diary 2.75 --end 3.7`.
+4. Find when "dev" is said (Whisper word timestamps on that line), render with `devdiary.py ... --title-start 4.0`, then
+   `python scripts/dd_intro.py base.mp4 out.mp4 --dev <t> --diary 2.95 --end 4.0`.
    Art: `brand/dev_alpha.png`, `brand/diary_alpha.png` (made with Nano Banana Pro from the Capyverse Odyssey logo, green background keyed out).
+
+
+Several clips from Bob for one diary: join them into one file first (ffmpeg concat filter, fps 30), then offset the second clip's times by the first clip's length. Bob's text file says what each clip shows; the script follows it, nothing more.
