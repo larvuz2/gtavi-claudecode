@@ -82,6 +82,7 @@ Footage from the developer comes as short pieces: editing in the engine (Bluepri
 3. Last line: `{"text":"(excited) Let's gooo!","caption":"Let's gooo!"}` right after the closing question, with 1 to 1.5 s of footage under it.
 4. Find when "dev" is said (Whisper word timestamps on that line), render with `devdiary.py ... --title-start 4.0`, then
    `python scripts/dd_intro.py base.mp4 out.mp4 --dev <t> --diary 2.95 --end 4.0`.
+   `dd_intro.py` also lays `brand/reveal_chime.wav` (3 s reveal chime, made by `scripts/sfx_reveal.py`) on the DIARY punch.
    Art: `brand/dev_alpha.png`, `brand/diary_alpha.png` (made with Nano Banana Pro from the Capyverse Odyssey logo, green background keyed out).
 
 

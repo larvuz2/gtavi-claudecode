@@ -48,6 +48,8 @@ def main():
     ap.add_argument("src"); ap.add_argument("dst")
     ap.add_argument("--dev", type=float, required=True); ap.add_argument("--diary", type=float, required=True)
     ap.add_argument("--end", type=float, required=True)
+    ap.add_argument("--chime", default=str(ROOT / "brand/reveal_chime.wav"), help="reveal sound started on DIARY ('' for none)")
+    ap.add_argument("--chime-gain", type=float, default=0.6)
     a = ap.parse_args()
     a_dev = Image.open(ROOT / "brand/dev_alpha.png").convert("RGBA")
     a_diary = Image.open(ROOT / "brand/diary_alpha.png").convert("RGBA")
@@ -58,9 +60,17 @@ def main():
         dim = f"eq=brightness=-0.22:saturation=0.75:enable='lt(t,{a.end - 0.15})'"
         graph = (f"[0:v]{dim},boxblur=6:1:enable='lt(t,{a.end - 0.15})'[bg];"
                  f"[1:v]format=rgba,setpts=PTS-STARTPTS[ov];[bg][ov]overlay=0:0:eof_action=pass:format=auto[v]")
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", a.src, "-framerate", str(FPS), "-i", f"{td}/f%04d.png",
-                        "-filter_complex", graph, "-map", "[v]", "-map", "0:a", "-c:v", "libx264", "-preset", "medium",
-                        "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", a.dst], check=True)
+        ins = ["-i", a.src, "-framerate", str(FPS), "-i", f"{td}/f%04d.png"]
+        amap, acodec = ["-map", "0:a"], ["-c:a", "copy"]
+        if a.chime:  # the reveal chime lands with DIARY
+            ins += ["-i", a.chime]
+            ms = int(a.diary * 1000)
+            graph += (f";[2:a]volume={a.chime_gain},adelay={ms}|{ms}[c];"
+                      f"[0:a][c]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[a]")
+            amap, acodec = ["-map", "[a]"], ["-c:a", "aac", "-b:a", "192k"]
+        subprocess.run(["ffmpeg", "-y", "-v", "error", *ins, "-filter_complex", graph, "-map", "[v]", *amap, "-c:v", "libx264",
+                        "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", *acodec, "-movflags", "+faststart", a.dst],
+                       check=True)
     print(a.dst)
 
 
