@@ -24,6 +24,22 @@ def pop(t):
     return 0.55 + 0.45 * (1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2)
 
 
+def text_art(word, fill, size=360):
+    """A word as plain bold typography (no AI art): Inter Black, thick dark-brown outline, soft drop shadow."""
+    from PIL import ImageDraw, ImageFont, ImageFilter
+    font = ImageFont.truetype("/usr/share/fonts/opentype/inter/Inter-Black.otf", size)
+    stroke = max(6, size // 18)
+    l, t, r, b = ImageDraw.Draw(Image.new("RGBA", (1, 1))).textbbox((0, 0), word, font=font, stroke_width=stroke)
+    pad = stroke * 3
+    w, h = r - l + pad * 2, b - t + pad * 2
+    shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).text((pad - l + stroke, pad - t + stroke * 1.6), word, font=font, fill=(0, 0, 0, 170),
+                                stroke_width=stroke, stroke_fill=(0, 0, 0, 170))
+    img = shadow.filter(ImageFilter.GaussianBlur(stroke * 0.8))
+    ImageDraw.Draw(img).text((pad - l, pad - t), word, font=font, fill=fill, stroke_width=stroke, stroke_fill=(59, 35, 20, 255))
+    return img
+
+
 def frame(t, dev, diary, end, a_dev, a_diary):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     out_k = 0.0 if t < end - 0.25 else min(1.0, (t - (end - 0.25)) / 0.25)    # punch out in the last 0.25 s
@@ -52,12 +68,18 @@ def main():
     ap.add_argument("--chime", default=str(ROOT / "brand/reveal_chime.wav"), help="reveal sound started on DIARY ('' for none)")
     ap.add_argument("--chime-gain", type=float, default=0.6)
     ap.add_argument("--vertical", action="store_true", help="1080x1920 layout")
+    ap.add_argument("--text", action="store_true", help="plain typography for DEV / DIARY instead of the sign images")
     a = ap.parse_args()
     global W, H, POS
     if a.vertical:
         W, H, POS = 1080, 1920, ((700, 940), (1150, 1000))
-    a_dev = Image.open(ROOT / "brand/dev_alpha.png").convert("RGBA")
-    a_diary = Image.open(ROOT / "brand/diary_alpha.png").convert("RGBA")
+    if a.text:  # gold DEV, cream DIARY, same outline as the headline
+        a_dev, a_diary = text_art("DEV", (244, 197, 66, 255)), text_art("DIARY", (250, 240, 220, 255))
+        POS = ((H // 2 - int(H * 0.17), int(W * (0.62 if a.vertical else 0.42))),
+               (H // 2 + int(H * 0.12), int(W * (0.86 if a.vertical else 0.60))))
+    else:
+        a_dev = Image.open(ROOT / "brand/dev_alpha.png").convert("RGBA")
+        a_diary = Image.open(ROOT / "brand/diary_alpha.png").convert("RGBA")
     with tempfile.TemporaryDirectory() as td:
         n = int(math.ceil(a.end * FPS))
         for i in range(n):

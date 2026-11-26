@@ -117,3 +117,7 @@ Same footage, same audio, new layout:
 `python scripts/devdiary_vertical.py --src out/<x>_base.src.mp4 --audio out/<x>_master.mp4 --lines narr/lines.json --segments "..." --title-words "..." --title-end <t> --out out/<x>_vert_base.mp4`
 then `python scripts/dd_intro.py out/<x>_vert_base.mp4 out/<x>_vert_master.mp4 --dev 3.27 --diary 4.02 --end 5.07 --vertical --chime ""` (the chime is already in the horizontal audio).
 Put it in the same Clip Drop section as the horizontal one, with a short TikTok-style caption.
+
+## DEV / DIARY overlay: plain text (current)
+
+The human prefers plain typography over the AI sign images: always pass `--text` to `dd_intro.py` (gold DEV, cream DIARY, Inter Black with the headline's dark-brown outline, same pop timing). The sign PNGs in `brand/` are kept but not used.
