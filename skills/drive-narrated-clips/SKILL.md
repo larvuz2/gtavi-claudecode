@@ -102,3 +102,11 @@ Several clips from Bob for one diary: join them into one file first (ffmpeg conc
 
 Three uncaptioned lines: `{"at":0.2,"text":"(excited) Hey, this is Bob!"}`, `{"at":1.75,"text":"(excited) And welcome to... Dev!"}` ("Dev" lands 1.5 s into the line, after the pause, so 3.25 s), `{"at":4.02,"text":"(excited) Diary!"}`. Narration starts at 5.27 s; `dd_intro.py --dev 3.25 --diary 4.02 --end 5.07`, `--title-start`/title words from ~5.3 s. Fill 0-5.07 s with one striking shot (slow it with `@0.8` if short).
 DIARY art is now the DEV typography (cream-white) with ivy only, no wooden plank (`brand/diary_alpha.png`, made with both the logo and the DEV image as references).
+
+
+## Opening v4 (approved, use exactly)
+
+The opening is four fixed audio takes in `brand/opening/`, never regenerated: `01_hey.wav` at 0.2 s, `02_this_is_bob.wav` at 1.02 s, `03_welcome_to_dev.wav` at 1.97 s ("Dev" at 3.27 s), `04_diary.wav` at 4.02 s. Spec lines use `"wav"` (see `example_dev_diary_spec.json`); `dd_intro.py --dev 3.27 --diary 4.02 --end 5.07`.
+Under the opening, quiet blaster fire: mix `brand/sfx_blasters.mp3` (Epidemic Sound via Higgsfield) into the mastered voice for 0-5.2 s at volume 0.18 with fades.
+Music default gain is now 0.3 with gentle ducking; Bob stays on top.
+When re-rendering an approved diary, copy its narr cache first so approved takes are reused, not regenerated.

@@ -105,7 +105,9 @@ def main():
         v = ln.get("voice", who.get("voice", voice))
         st = ", ".join(x for x in (who.get("style", style), ln.get("mood", "")) if x)
         engine = ln.get("engine", who.get("engine", spec.get("engine", "gemini")))
-        if engine == "fish":
+        if ln.get("wav"):  # a prepared take (e.g. a spliced piece of an approved line), used as-is
+            wav = Path(ln["wav"])
+        elif engine == "fish":
             wav = speak_fish(ln["text"], who.get("reference_id", spec.get("reference_id")), cache, float(spec.get("fish_speed", 1.0)))
         else:
             wav = speak(ln["text"], v, st, cache)

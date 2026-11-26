@@ -5,17 +5,26 @@
  "lines": [
   {
    "at": 0.2,
-   "text": "(excited) Hey, this is Bob!",
+   "wav": "brand/opening/01_hey.wav",
+   "text": "Hey!",
    "caption": ""
   },
   {
-   "at": 1.75,
-   "text": "(excited) And welcome to... Dev!",
+   "at": 1.02,
+   "wav": "brand/opening/02_this_is_bob.wav",
+   "text": "This is Bob!",
+   "caption": ""
+  },
+  {
+   "at": 1.97,
+   "wav": "brand/opening/03_welcome_to_dev.wav",
+   "text": "Welcome to... Dev!",
    "caption": ""
   },
   {
    "at": 4.02,
-   "text": "(excited) Diary!",
+   "wav": "brand/opening/04_diary.wav",
+   "text": "Diary!",
    "caption": ""
   },
   {

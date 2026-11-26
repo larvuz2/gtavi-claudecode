@@ -120,7 +120,7 @@ def main():
     ap.add_argument("--title-words", default="", help='big centred title thrown word by word: "THE@4.72,CLOWN@5.18,..."')
     ap.add_argument("--title-end", type=float, default=0.0)
     ap.add_argument("--music", default="", help="background music file, kept under the voice and ducked while it speaks")
-    ap.add_argument("--music-gain", type=float, default=0.16)
+    ap.add_argument("--music-gain", type=float, default=0.3)
     a = ap.parse_args()
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
     segs = parse_segments(a.segments)
@@ -143,7 +143,7 @@ def main():
         ins += ["-stream_loop", "-1", "-i", a.music]
         graph += (f"[vox]asplit[vox][key];[2:a]aresample=48000,volume={a.music_gain},afade=t=in:d=1.2,"
                   f"afade=t=out:st={max(0, total - 1.8):.2f}:d=1.8[mus];"
-                  f"[mus][key]sidechaincompress=threshold=0.015:ratio=5:attack=40:release=450[md];"
+                  f"[mus][key]sidechaincompress=threshold=0.05:ratio=2.5:attack=60:release=500[md];"
                   f"[bed][vox][md]amix=inputs=3:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[ao]")
     else:
         graph += "[bed][vox]amix=inputs=2:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[ao]"
